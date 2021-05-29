@@ -10,7 +10,7 @@ class TestIOU(unittest.TestCase):
       result = iou(boxes1, boxes2)
 
       self.assertEqual(result.shape, tuple())
-      self.assertTrue(result.item() == 0.25)
+      self.assertEqual(result.item(), 0.25)
 
       boxes1 = torch.tensor([0., 0., 1., 1.])
       boxes2 = torch.tensor([
@@ -31,7 +31,7 @@ class TestIOU(unittest.TestCase):
       result = generalized_iou(boxes1, boxes2)
 
       self.assertEqual(result.shape, tuple())
-      self.assertTrue(result.item() == 0.25)
+      self.assertEqual(result.item(), 0.25)
 
       boxes1 = torch.tensor([0., 0., 1., 1.])
       boxes2 = torch.tensor([
