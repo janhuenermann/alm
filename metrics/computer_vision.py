@@ -71,8 +71,8 @@ def precision_recall(labels, predictions, confidence,
                      iou_threshold: float = 0.5):
    """
    Computes the precision-recall curve (P-R curve) given
-   a ranked list of detections (decreasing probability)
-   and labels.
+   predictions and labels. If `image_dim` is set, aggregates
+   over multiple images.
    
    labels: Ground truth bounding boxes with shape [*, n, 4]
    predictions: Predicted bounding boxes with shape [*, m, 4]
@@ -137,8 +137,8 @@ def average_precision(labels, predictions, confidence,
                       interpolation_points: Optional[int] = None):
    """
    Computes the average precision (AP) given
-   a ranked list of detections (decreasing probability)
-   and labels.
+   predictions and labels. If `image_dim` is set, aggregates
+   over multiple images.
    
    labels: Ground truth bounding boxes with shape [*, n, 4]
    predictions: Predicted bounding boxes with shape [*, m, 4]
