@@ -3,7 +3,12 @@ from cv2 import convexHull
 
 
 def normalize_polygon(poly, cw=True):
-    """Returns a polygon which is always oriented clockwise"""
+    """
+    Returns a polygon which is always oriented clockwise
+    
+    poly: Polygon with shape [*, 2]
+    cw: True to normalize to clockwise, otherwise will normalize to ccw
+    """
     p0, p1 = poly, np.roll(poly, 1, 0)
     is_ccw = np.sum((p1[:, 0] - p0[:, 0]) * (p1[:, 1] + p0[:, 1])) < 0.
     if is_ccw == cw:
@@ -12,7 +17,11 @@ def normalize_polygon(poly, cw=True):
 
 
 def min_rotated_rect(poly):
-    """Returns the four points of the smallest rotated rect that covers the given poly"""
+    """
+    Returns the four points of the smallest rotated rect that covers the given polygon
+    
+    poly: Polygon with shape [*, 2]
+    """
     ch = convexHull(poly.astype(np.float32))[:, 0]
     edges = ch - np.roll(ch, 1, 0)
     edges = edges / np.linalg.norm(edges, 2, -1)[:, None]
@@ -32,7 +41,12 @@ def min_rotated_rect(poly):
 
 
 def shoelace(poly, strict=False):
-    """Returns the area of the polygon using the shoelace formula"""
+    """
+    Returns the area of the polygon using the shoelace formula
+    
+    poly: Polygon with the shape [*, 2]
+    strict: Whether to remove duplicate points from the polygon
+    """
     if strict:
         _, order = np.unique(poly, axis=0, return_index=True)
         poly = poly[np.sort(order)]
