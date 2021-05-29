@@ -9,6 +9,7 @@ _Framework_: NumPy
 #### `metrics`
 _Framework_: PyTorch
 
+- Compute the _Precision-Recall_ Curve (P-R Curve) and _Average Precision_ (AP) on the GPU using PyTorch
 - Intersection over union (IOU), and generalized intersection over union (gIOU, https://giou.stanford.edu/)
 
 #### `probability`
