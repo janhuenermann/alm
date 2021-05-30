@@ -9,8 +9,9 @@ _Framework_: NumPy
 #### `metrics`
 _Framework_: PyTorch
 
-- Compute the _Precision-Recall_ Curve (P-R Curve) and _Average Precision_ (AP) on the GPU using PyTorch
-- Intersection over union (IOU), and generalized intersection over union (gIOU, https://giou.stanford.edu/)
+- _Precision-Recall_ Curve (P-R Curve) and _Average Precision_ (AP) for Object Detection on the GPU
+- Intersection over union (IOU), and generalized Intersection over Union (gIOU, https://giou.stanford.edu/)
+- **TODO**: Common depth estimation metrics like _Square Rel_, _Abs Rel_, _A1_-, _A2_-, and _A3_- accuracies, and _RMSE_ 
 
 #### `probability`
 _Framework_: PyTorch
