@@ -16,6 +16,6 @@ except OSError:
 
 exts.append(CppExtension(name='alm_ext_cpu', 
     sources=['geometry/native/sutherland_hodgman_cpu.cpp'],
-    extra_compile_args=["-O3"]))
+    extra_compile_args=["-O3", "-funroll-loops"]))
 
 setup(name='alm_ext', ext_modules=exts, cmdclass={'build_ext': BuildExtension})

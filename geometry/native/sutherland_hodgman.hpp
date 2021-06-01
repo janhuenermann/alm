@@ -4,24 +4,36 @@
 #define SUTHERLAND_HODGMAN
 
 #ifdef __CUDACC__
-#define SHARED __host__ __device__
+#define SHARED __device__
 #else
 #define SHARED
 #endif
 
-SHARED bool outside(const float *&p, const float *&a, const float *&b) {
-   return (p[1]-a[1]) * (b[0]-a[0]) - (p[0]-a[0]) * (b[1]-a[1]) < 0;
+SHARED bool outside(const float *&p, const float *&a, const float *r) {
+   return r[0] * (p[1] - a[1]) < r[1] * (p[0] - a[0]);
 }
 
-SHARED void intersect(float *&p, const float *&a, const float *&b, const float *&c, const float *&d) {
-   float rx = b[0] - a[0], ry = b[1] - a[1];
+SHARED void intersect(float *&p, const float *&a, const float *r, const float *&c, const float *&d) {
    float sx = d[0] - c[0], sy = d[1] - c[1];
-   float t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / (rx * sy - ry * sx);
-   p[0] = a[0] + rx * t;
-   p[1] = a[1] + ry * t;
+   float t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / (r[0] * sy - r[1] * sx);
+#ifdef __CUDACC__
+   p[0] = __fmaf_rn(r[0],t,a[0]);
+   p[1] = __fmaf_rn(r[1],t,a[1]);
+#else
+   p[0] = a[0] + r[0] * t;
+   p[1] = a[1] + r[1] * t;
+#endif
 }
 
-SHARED int64_t edge_clip(float *result, const float *polygon, const float *&a, const float *&b, const int64_t &n) {
+SHARED int64_t edge_clip(float *result, const float *polygon, const float *a, const float *b, const int64_t &n) {
+   if (n <= 2) {
+      return 0;
+   }
+
+   float r[2]; // precompute slope of line a -> b
+   r[0] = b[0] - a[0];
+   r[1] = b[1] - a[1];
+
    const float *v0, *v1;
    float *vout = result;
    bool p1, p2;
@@ -31,11 +43,11 @@ SHARED int64_t edge_clip(float *result, const float *polygon, const float *&a, c
       v0 = polygon + i*2;
       v1 = polygon + ((i+1)%n)*2;
 
-      p1 = outside(v0, a, b);
-      p2 = outside(v1, a, b);
+      p1 = outside(v0, a, r);
+      p2 = outside(v1, a, r);
 
       if (p1 != p2) {
-         intersect(vout, v0, v1, a, b);
+         intersect(vout, a, r, v0, v1);
          vout += 2;
       }
 
@@ -49,30 +61,27 @@ SHARED int64_t edge_clip(float *result, const float *polygon, const float *&a, c
    return (vout - result)/2;
 }
 
+#define swap(x, y) ___tmp = b; b = a; a = ___tmp
+
 SHARED int64_t polygon_clip(float *result, float *tmp, const float *polygon1, const float *polygon2, const int64_t &n, const int64_t &m) {
-   const float *a, *b;
    int64_t l = n;
-   
-   #pragma unroll 4
-   for (int i = 0; i < m; ++i) {
-      if (l == 0) {
-         return 0;
-      }
-
-      a = polygon2+2*i;
-      b = polygon2+2*((i+1)%m);
-
-      if (i == 0)
-         l = edge_clip(tmp, polygon1, a, b, l);
-      else if (i % 2 == 1)
-         l = edge_clip(result, tmp, a, b, l);
-      else
-         l = edge_clip(tmp, result, a, b, l);
+   if (l <= 2) {
+      return 0;
    }
 
-   if (m % 2 == 1)
-      memcpy(result, tmp, sizeof(float) * 2 * l);
+   float *a = tmp, *b = result, *___tmp;
+   if (m % 2 == 1) { // m - 1 is even => copy in result first
+      swap(a, b);
+   }
 
+   // Copy from polygon1 into tmp
+   l = edge_clip(a, polygon1, polygon2, polygon2+2, l);
+   for (int i = 1; i < m - 1; ++i) {
+      l = edge_clip(b, a, polygon2+2*i, polygon2+2*i+2, l);
+      swap(a, b);
+   }
+
+   l = edge_clip(b, a, polygon2+2*(m-1), polygon2, l);
    return l;
 }
 
