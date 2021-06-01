@@ -53,4 +53,3 @@ def shoelace(poly, strict=False):
     s1 = np.sum(poly[:,0] * np.roll(poly[:,1], -1))
     s2 = np.sum(poly[:,1] * np.roll(poly[:,0], -1))
     return np.absolute(s1 - s2) / 2.
-
