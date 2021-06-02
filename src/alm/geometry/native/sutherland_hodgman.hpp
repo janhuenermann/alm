@@ -10,12 +10,12 @@
 #endif
 
 template <typename scalar_t>
-SHARED bool outside(const scalar_t *&p, const scalar_t *&a, const scalar_t *r) {
-   return r[0] * (p[1] - a[1]) < r[1] * (p[0] - a[0]);
+SHARED bool outside(const scalar_t *p, const scalar_t *a, const scalar_t *r) {
+   return r[1] * (p[0] - a[0]) - r[0] * (p[1] - a[1]) > 0;
 }
 
 template <typename scalar_t>
-SHARED void intersect(scalar_t *&p, const scalar_t *&a, const scalar_t *r, const scalar_t *&c, const scalar_t *&d) {
+SHARED void intersect(scalar_t *p, const scalar_t *a, const scalar_t *r, const scalar_t *c, const scalar_t *d) {
    scalar_t sx = d[0] - c[0], sy = d[1] - c[1];
    scalar_t t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / (r[0] * sy - r[1] * sx);
    p[0] = a[0] + r[0] * t;
@@ -23,71 +23,97 @@ SHARED void intersect(scalar_t *&p, const scalar_t *&a, const scalar_t *r, const
 }
 
 template <typename scalar_t>
-SHARED int64_t edge_clip(scalar_t *result, const scalar_t *polygon, const scalar_t *a, const scalar_t *b, const int64_t &n) {
-   if (n <= 2) {
-      return 0;
+SHARED void edge_clip(scalar_t *result, const scalar_t *polygon, const scalar_t *a, const scalar_t *b, int64_t &n, const int64_t &qmax) {
+   if (n <= 1) {
+      return ;
    }
 
-   scalar_t r[2]; // precompute slope of line a -> b
-   r[0] = b[0] - a[0];
-   r[1] = b[1] - a[1];
+   // precompute slope of line a -> b
+   scalar_t r[2] = {
+      b[0] - a[0],
+      b[1] - a[1]
+   };
 
-   const scalar_t *v0, *v1;
-   scalar_t *vout = result;
-   bool p1, p2;
+   const scalar_t * point0 = polygon + 2 * n - 2;
+   const scalar_t * point1 = polygon;
+
+   int64_t size = 0;
+   bool out0, out1;
 
    #pragma unroll 4
-   for(int i = 0; i < n; i++) {
-      v0 = polygon + i*2;
-      v1 = polygon + ((i+1)%n)*2;
+   for(int64_t i = 0; i < n; i++) {
+      out0 = outside(point0, a, r);
+      out1 = outside(point1, a, r);
 
-      p1 = outside(v0, a, r);
-      p2 = outside(v1, a, r);
-
-      if (p1 != p2) {
-         intersect(vout, a, r, v0, v1);
-         vout += 2;
+      if (out0 != out1) {
+         intersect(result, a, r, point0, point1);
+         result += 2;
+         // Check that we are not out of bounds
+         if ((++size) >= qmax) break ;
       }
 
-      if (!p2) {
-         vout[0] = v1[0];
-         vout[1] = v1[1];
-         vout += 2;
+      if (!out1) {
+         result[0] = point1[0];
+         result[1] = point1[1];
+         result += 2;
+         // Check that we are not out of bounds
+         if ((++size) >= qmax) break ;
       }
+
+      point0 = point1;
+      point1 += 2;
    }
 
-   return (vout - result)/2;
+   n = size;
 }
 
-#define swap(x, y) ___tmp = b; b = a; a = ___tmp
+#define swap(x, y) ___tmp = y; y = x; x = ___tmp
 
 template <typename scalar_t>
-SHARED int64_t polygon_clip(scalar_t *result, scalar_t *tmp, const scalar_t *polygon1, const scalar_t *polygon2, const int64_t &n, const int64_t &m) {
-   int64_t l = n;
-   if (l <= 2) {
+SHARED int64_t polygon_clip(scalar_t *result, scalar_t *tmp, const scalar_t *polygon1, const scalar_t *polygon2, const int64_t &n, const int64_t &m, const int64_t &qmax) {
+   if (m <= 1) {
       return 0;
    }
 
-   scalar_t *a = tmp, *b = result, *___tmp;
-   if (m % 2 == 1) { // m - 1 is even => copy in result first
+   int64_t l = n;
+   scalar_t * a = tmp, * b = result, * ___tmp;
+   if (m % 2 == 1) {
       swap(a, b);
    }
 
-   // Copy from polygon1 into tmp
-   l = edge_clip(a, polygon1, polygon2, polygon2+2, l);
-   for (int i = 1; i < m - 1; ++i) {
-      l = edge_clip(b, a, polygon2+2*i, polygon2+2*i+2, l);
+   // For m = 4 (m is even):
+   // polygon1 -> tmp
+   // tmp -> result
+   // result -> tmp
+   // tmp -> result
+
+   // For m = 5 (m is odd):
+   // polygon1 -> result
+   // result -> tmp
+   // tmp -> result
+   // result -> tmp
+   // tmp -> result
+
+   // Wrap around
+   edge_clip(a, polygon1, polygon2 + 2 * m - 2, polygon2, l, qmax);
+
+   // All lines going forward
+   for (int i = 1; i < m; ++i) {
+      edge_clip(b, a, polygon2, polygon2 + 2, l, qmax);
       swap(a, b);
+      polygon2 += 2;
    }
 
-   return edge_clip(b, a, polygon2+2*(m-1), polygon2, l);
+   return l;
 }
 
 template <typename scalar_t>
 SHARED scalar_t shoelace(const scalar_t *polygon, const int64_t &n) {
-   scalar_t area2 = 0;
+   if (n <= 2) {
+      return 0.0F;
+   }
    // x_n y_1 - x_1 y_n
-   area2 += polygon[2*n] * polygon[1] - polygon[0] * polygon[2*n+1];
+   scalar_t area2 = polygon[2*n-2] * polygon[1] - polygon[0] * polygon[2*n-1];
    for (int k = 1; k < n; ++k) {
       // x_{n-1} y_n - x_n y_{n-1}
       area2 += polygon[0] * polygon[3] - polygon[2] * polygon[1];

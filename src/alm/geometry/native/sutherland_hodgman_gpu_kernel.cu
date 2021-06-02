@@ -4,6 +4,7 @@
 
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <assert.h>
 
 #include "sutherland_hodgman.hpp"
 
@@ -30,18 +31,23 @@ __global__ void sutherland_hodgman_gpu_kernel(scalar_t *result_data,
       return ;
    }
 
-   scalar_t * tmp = reinterpret_cast<scalar_t *>(__nv_aligned_device_malloc(2 * out_len * sizeof(scalar_t), 2));
+   scalar_t * tmp = reinterpret_cast<scalar_t *>(malloc(2 * out_len * sizeof(scalar_t)));
+   
+   assert(tmp != NULL);
 
    const int result_stride = out_len * 2;
    const int poly1_stride = poly1_len * 2;
    const int poly2_stride = poly2_len * 2;
+   int64_t npoly;
 
    result_data += index*result_stride;
    poly1_data += index*poly1_stride;
    poly2_data += index*poly2_stride;
 
    for (; index < end; ++index) {
-      polygon_clip(result_data, tmp, poly1_data, poly2_data, poly1_len, poly2_len);
+      npoly = polygon_clip(result_data, tmp, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
+      
+      assert(npoly <= out_len);
 
       result_data += result_stride;
       poly1_data += poly1_stride;
@@ -62,21 +68,25 @@ __global__ void compute_intersection_area_gpu_kernel(scalar_t *result_data,
       return ;
    }
 
-   scalar_t * tmp = reinterpret_cast<scalar_t *>(__nv_aligned_device_malloc(4 * out_len * sizeof(scalar_t), 2));
-   scalar_t * intersection_polygon = tmp + 2*out_len;
-   
+   scalar_t * tmp = reinterpret_cast<scalar_t *>(malloc(4 * out_len * sizeof(scalar_t)));
+
+   assert(tmp != NULL);
+
    const int poly1_stride = poly1_len*2;
    const int poly2_stride = poly2_len*2;
+   int64_t npoly;
 
    result_data += index;
    poly1_data += index*poly1_stride;
    poly2_data += index*poly2_stride;
 
    for (; index < end; ++index) {
-      int npoly = polygon_clip(intersection_polygon, tmp, poly1_data, poly2_data, poly1_len, poly2_len);
-      result_data[0] = shoelace(intersection_polygon, npoly);
+      npoly = polygon_clip(tmp, tmp + 2*out_len, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
 
-      result_data++;
+      assert(npoly <= out_len);
+
+      *(result_data++) = shoelace(tmp, npoly);
+
       poly1_data += poly1_stride;
       poly2_data += poly2_stride;
    }
@@ -93,10 +103,9 @@ Tensor sutherland_hodgman_gpu(const Tensor &poly1, const Tensor &poly2) {
    out_shape.push_back(2);
    torch::Tensor result = at::zeros(out_shape, poly1.options());
 
-   const dim3 blocks((out_count + block_work_size - 1) / block_work_size);
-   auto stream = at::cuda::getCurrentCUDAStream();
-
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_gpu", [&] {
+      const dim3 blocks((out_count + block_work_size - 1) / block_work_size);
+      auto stream = at::cuda::getCurrentCUDAStream();
       sutherland_hodgman_gpu_kernel<<<blocks, num_threads, 0, stream>>>(
          result.data_ptr<scalar_t>(),
          poly1.data_ptr<scalar_t>(),
@@ -116,12 +125,11 @@ Tensor compute_intersection_area_gpu(const Tensor &poly1, const Tensor &poly2) {
    CHECK_INPUT(poly2);
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
-   torch::Tensor result = at::zeros(out_shape, poly1.options());
-
-   const dim3 blocks((out_count + block_work_size - 1) / block_work_size);
-   auto stream = at::cuda::getCurrentCUDAStream();
+   torch::Tensor result = at::empty(out_shape, poly1.options());
 
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "compute_intersection_area_gpu", [&] {
+      const dim3 blocks((out_count + block_work_size - 1) / block_work_size);
+      auto stream = at::cuda::getCurrentCUDAStream();
       compute_intersection_area_gpu_kernel<<<blocks, num_threads, 0, stream>>>(
          result.data_ptr<scalar_t>(),
          poly1.data_ptr<scalar_t>(),

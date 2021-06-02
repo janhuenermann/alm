@@ -36,7 +36,7 @@ Tensor sutherland_hodgman(const Tensor &poly1, const Tensor &poly2) {
                reinterpret_cast<scalar_t *>(result_data), tmp, 
                reinterpret_cast<const scalar_t *>(poly1_data),
                reinterpret_cast<const scalar_t *>(poly2_data),
-               poly1_len, poly2_len);
+               poly1_len, poly2_len, out_len);
 
             result_data += strides[0];
             poly1_data += strides[1];
@@ -76,7 +76,7 @@ Tensor compute_intersection_area(const Tensor &poly1, const Tensor &poly2) {
                intersection_polygon, tmp, 
                reinterpret_cast<const scalar_t *>(poly1_data),
                reinterpret_cast<const scalar_t *>(poly2_data),
-               poly1_len, poly2_len);
+               poly1_len, poly2_len, out_len);
             result_data[0] = shoelace(intersection_polygon, npoly);
             result_data += strides[0];
             poly1_data += strides[1];
