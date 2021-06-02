@@ -1,37 +1,20 @@
 import numpy as np
+import os
 import torch
 from cv2 import convexHull
 from torch.utils.cpp_extension import load
-
-try:
-    native_gpu = load(name='native_gpu', sources=[
-        'native/sutherland_hodgman_gpu.cpp',
-        'native/sutherland_hodgman_gpu_kernel.cu'
-    ])
-except Exception as exc:
-    print("Failed to compile CUDA extension: {}".format(exc))
-    native_gpu = None
-
-
-try:
-    native_cpu = load(name='native_cpu', sources=[
-        'native/sutherland_hodgman_cpu.cpp'
-    ])
-except Exception as exc:
-    print("Failed to compile C++ extension: {}".format(exc))
-    native_cpu = None
 
 
 def convex_convex_intersection(poly1, poly2):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
-        if native_gpu is None:
-            raise RuntimeError("Failed to compile CUDA extension for geometry package")
+        if isinstance(native_gpu, str):
+            raise RuntimeError("Failed to compile CUDA extension for geometry package: {}".format(native_gpu))
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
         return native_gpu.sutherland_hodgman(poly1, poly2)
     else:
-        if native_cpu is None:
-            raise RuntimeError("Failed to compile C++ extension for geometry package")
+        if isinstance(native_cpu, str):
+            raise RuntimeError("Failed to compile C++ extension for geometry package: {}".format(native_cpu))
         return native_cpu.sutherland_hodgman(poly1, poly2)
 
 
@@ -86,3 +69,30 @@ def shoelace(poly, strict=False):
     s1 = np.sum(poly[:,0] * np.roll(poly[:,1], -1))
     s2 = np.sum(poly[:,1] * np.roll(poly[:,0], -1))
     return np.absolute(s1 - s2) / 2.
+
+
+
+native_path = os.path.join(os.path.dirname(__file__), "native")
+
+
+try:
+    source_list = [
+        'sutherland_hodgman_gpu.cpp',
+        'sutherland_hodgman_gpu_kernel.cu'
+    ]
+    native_gpu = load(
+        name='native_gpu',
+        sources=[os.path.join(native_path, source) for source in source_list])
+except Exception as exc:
+    native_gpu = "{}".format(exc)
+
+
+try:
+    source_list = [
+        'sutherland_hodgman_cpu.cpp'
+    ]
+    native_cpu = load(
+        name='native_cpu',
+        sources=[os.path.join(native_path, source) for source in source_list])
+except Exception as exc:
+    native_cpu = "{}".format(exc)
