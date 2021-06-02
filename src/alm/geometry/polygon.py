@@ -18,6 +18,19 @@ def convex_convex_intersection(poly1, poly2):
         return native_cpu.sutherland_hodgman(poly1, poly2)
 
 
+def area_of_intersection(poly1, poly2):
+    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
+    if poly1.is_cuda:
+        if isinstance(native_gpu, str):
+            raise RuntimeError("Failed to compile CUDA extension for geometry package: {}".format(native_gpu))
+        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
+        return native_gpu.compute_intersection_area(poly1, poly2)
+    else:
+        if isinstance(native_cpu, str):
+            raise RuntimeError("Failed to compile C++ extension for geometry package: {}".format(native_cpu))
+        return native_cpu.compute_intersection_area(poly1, poly2)
+
+
 def normalize_polygon(poly, cw=True):
     """
     Returns a polygon which is always oriented clockwise
