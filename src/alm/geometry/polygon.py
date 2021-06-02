@@ -96,8 +96,8 @@ try:
     ]
     native_cpu = load(
         name='native_cpu',
-        extra_cflags=["-Ofast"],
-        extra_ldflags=["-Ofast"],
+        extra_cflags=["-O3"],
+        extra_ldflags=["-O3"],
         sources=[os.path.join(native_path, source) for source in source_list])
 except Exception as exc:
     print("Failed to compile C++ extension for geometry package: {}".format(exc))

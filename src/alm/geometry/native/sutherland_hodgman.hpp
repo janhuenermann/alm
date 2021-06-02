@@ -83,6 +83,19 @@ SHARED int64_t polygon_clip(scalar_t *result, scalar_t *tmp, const scalar_t *pol
    return edge_clip(b, a, polygon2+2*(m-1), polygon2, l);
 }
 
+template <typename scalar_t>
+SHARED scalar_t shoelace(const scalar_t *polygon, const int64_t &n) {
+   scalar_t area2 = 0;
+   // x_n y_1 - x_1 y_n
+   area2 += polygon[2*n] * polygon[1] - polygon[0] * polygon[2*n+1];
+   for (int k = 1; k < n; ++k) {
+      // x_{n-1} y_n - x_n y_{n-1}
+      area2 += polygon[0] * polygon[3] - polygon[2] * polygon[1];
+      polygon += 2;
+   }
+   return area2 / 2.0F;
+}
+
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf
 int64_t get_max_intersection_count(int64_t p, int64_t q) {
    return std::min(2 * p, 2 * q);
@@ -95,6 +108,8 @@ int64_t get_max_intersection_count(int64_t p, int64_t q) {
    TORCH_CHECK(poly2.size(-1) == 2, "You provided a tensor for polygon 2 with invalid shape. size(-1) must be 2. Here it is ", poly2.size(-1), ".");\
    TORCH_CHECK(poly1.size(-2) > 2, "You provided a tensor for polygon 1 with invalid shape. size(-2) must be greater than 2. Here it is ", poly1.size(-2), ".");\
    TORCH_CHECK(poly2.size(-2) > 2, "You provided a tensor for polygon 2 with invalid shape. size(-2) must be greater than 2. Here it is ", poly2.size(-2), ".");\
+   TORCH_CHECK(poly1.stride(-1) == 1, "Polygon 1 is not stored in column minor format");\
+   TORCH_CHECK(poly2.stride(-1) == 1, "Polygon 2 is not stored in column minor format");\
    std::vector<int64_t> out_shape;\
    for (int k = 0; k < poly1.dim() - 2; ++k) {\
       TORCH_CHECK(poly1.size(k) == poly2.size(k), "Dimension ", k, " must match for both polygon tensors. [poly1.size(", k, ") = ", poly1.size(k), "] != [", poly2.size(k), " = poly2.size(", k, ")]");\
@@ -103,10 +118,7 @@ int64_t get_max_intersection_count(int64_t p, int64_t q) {
    int64_t poly1_len = poly1.size(-2);\
    int64_t poly2_len = poly2.size(-2);\
    int64_t out_len = get_max_intersection_count(poly1_len, poly2_len);\
-   int64_t out_count = poly1.numel() / (2 * poly1_len);\
-   out_shape.push_back(out_len);\
-   out_shape.push_back(2);\
-   torch::Tensor result = at::zeros(out_shape, poly1.options())
+   int64_t out_count = poly1.numel() / (2 * poly1_len);
 
 
 
