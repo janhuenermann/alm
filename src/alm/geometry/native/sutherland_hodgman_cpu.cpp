@@ -23,7 +23,7 @@ Tensor sutherland_hodgman(const Tensor &poly1, const Tensor &poly2) {
 
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_cpu", [&] {
       iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
-         scalar_t *tmp = malloc(2 * out_len * sizeof(scalar_t));
+         scalar_t *tmp = reinterpret_cast<scalar_t *>(malloc(2 * out_len * sizeof(scalar_t)));
          char *result_data = data[0];
          const char *poly1_data = data[1];
          const char *poly2_data = data[2];
