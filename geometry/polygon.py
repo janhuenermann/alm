@@ -1,5 +1,36 @@
 import numpy as np
+import torch
 from cv2 import convexHull
+from torch.utils.cpp_extension import load
+
+try:
+    native_gpu = load(name='native_gpu', sources=[
+        'native/sutherland_hodgman_gpu.cpp',
+        'native/sutherland_hodgman_gpu_kernel.cu'
+    ])
+except:
+    native_gpu = None
+
+
+try:
+    native_cpu = load(name='native_cpu', sources=[
+        'native/sutherland_hodgman_cpu.cpp'
+    ])
+except:
+    native_cpu = None
+
+
+def convex_convex_intersection(poly1, poly2):
+    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
+    if poly1.is_cuda():
+        if native_gpu is None:
+            raise RuntimeError("Failed to compile CUDA extension for geometry package")
+        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
+        return native_gpu.sutherland_hodgman(poly1, poly2)
+    else:
+        if native_cpu is None:
+            raise RuntimeError("Failed to compile C++ extension for geometry package")
+        return native_cpu.sutherland_hodgman(poly1, poly2)
 
 
 def normalize_polygon(poly, cw=True):
