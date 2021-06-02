@@ -84,6 +84,7 @@ try:
         name='native_gpu',
         sources=[os.path.join(native_path, source) for source in source_list])
 except Exception as exc:
+    print("Failed to compile CUDA extension for geometry package: {}".format(exc))
     native_gpu = "{}".format(exc)
 
 
@@ -95,4 +96,5 @@ try:
         name='native_cpu',
         sources=[os.path.join(native_path, source) for source in source_list])
 except Exception as exc:
+    print("Failed to compile C++ extension for geometry package: {}".format(exc))
     native_cpu = "{}".format(exc)

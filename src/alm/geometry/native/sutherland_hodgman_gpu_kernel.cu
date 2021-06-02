@@ -18,8 +18,9 @@ constexpr int block_work_size = num_threads * thread_work_size;
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
-__global__ void sutherland_hodgman_gpu_kernel(float *result,
-                                              const float *poly1, const float *poly2,
+template <typename scalar_t>
+__global__ void sutherland_hodgman_gpu_kernel(scalar_t *result,
+                                              const scalar_t *poly1, const scalar_t *poly2,
                                               const int out_count, const int out_len,
                                               const int poly1_len, const int poly2_len) {
    int index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
@@ -29,7 +30,7 @@ __global__ void sutherland_hodgman_gpu_kernel(float *result,
       return ;
    }
 
-   float * tmp = reinterpret_cast<float *>(__nv_aligned_device_malloc(2 * out_len * sizeof(float), 2));
+   scalar_t * tmp = reinterpret_cast<scalar_t *>(__nv_aligned_device_malloc(2 * out_len * sizeof(scalar_t), 2));
 
    const int result_stride = out_len * 2;
    const int poly1_stride = poly1_len * 2;
@@ -55,14 +56,16 @@ Tensor sutherland_hodgman_gpu(const Tensor &poly1, const Tensor &poly2) {
    const dim3 blocks((out_count + block_work_size - 1) / block_work_size);
    auto stream = at::cuda::getCurrentCUDAStream();
 
-   sutherland_hodgman_gpu_kernel<<<blocks, num_threads, 0, stream>>>(
-      result.data_ptr<float>(),
-      poly1.data_ptr<float>(),
-      poly2.data_ptr<float>(),
-      out_count,
-      out_len,
-      poly1_len,
-      poly2_len);
+   AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_gpu", [&] {
+      sutherland_hodgman_gpu_kernel<<<blocks, num_threads, 0, stream>>>(
+         result.data_ptr<scalar_t>(),
+         poly1.data_ptr<scalar_t>(),
+         poly2.data_ptr<scalar_t>(),
+         out_count,
+         out_len,
+         poly1_len,
+         poly2_len);
+   });
 
    return result;
 }

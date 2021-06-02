@@ -9,33 +9,31 @@
 #define SHARED
 #endif
 
-SHARED bool outside(const float *&p, const float *&a, const float *r) {
+template <typename scalar_t>
+SHARED bool outside(const scalar_t *&p, const scalar_t *&a, const scalar_t *r) {
    return r[0] * (p[1] - a[1]) < r[1] * (p[0] - a[0]);
 }
 
-SHARED void intersect(float *&p, const float *&a, const float *r, const float *&c, const float *&d) {
-   float sx = d[0] - c[0], sy = d[1] - c[1];
-   float t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / (r[0] * sy - r[1] * sx);
-#ifdef __CUDACC__
-   p[0] = __fmaf_rn(r[0],t,a[0]);
-   p[1] = __fmaf_rn(r[1],t,a[1]);
-#else
+template <typename scalar_t>
+SHARED void intersect(scalar_t *&p, const scalar_t *&a, const scalar_t *r, const scalar_t *&c, const scalar_t *&d) {
+   scalar_t sx = d[0] - c[0], sy = d[1] - c[1];
+   scalar_t t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / (r[0] * sy - r[1] * sx);
    p[0] = a[0] + r[0] * t;
    p[1] = a[1] + r[1] * t;
-#endif
 }
 
-SHARED int64_t edge_clip(float *result, const float *polygon, const float *a, const float *b, const int64_t &n) {
+template <typename scalar_t>
+SHARED int64_t edge_clip(scalar_t *result, const scalar_t *polygon, const scalar_t *a, const scalar_t *b, const int64_t &n) {
    if (n <= 2) {
       return 0;
    }
 
-   float r[2]; // precompute slope of line a -> b
+   scalar_t r[2]; // precompute slope of line a -> b
    r[0] = b[0] - a[0];
    r[1] = b[1] - a[1];
 
-   const float *v0, *v1;
-   float *vout = result;
+   const scalar_t *v0, *v1;
+   scalar_t *vout = result;
    bool p1, p2;
 
    #pragma unroll 4
@@ -63,13 +61,14 @@ SHARED int64_t edge_clip(float *result, const float *polygon, const float *a, co
 
 #define swap(x, y) ___tmp = b; b = a; a = ___tmp
 
-SHARED int64_t polygon_clip(float *result, float *tmp, const float *polygon1, const float *polygon2, const int64_t &n, const int64_t &m) {
+template <typename scalar_t>
+SHARED int64_t polygon_clip(scalar_t *result, scalar_t *tmp, const scalar_t *polygon1, const scalar_t *polygon2, const int64_t &n, const int64_t &m) {
    int64_t l = n;
    if (l <= 2) {
       return 0;
    }
 
-   float *a = tmp, *b = result, *___tmp;
+   scalar_t *a = tmp, *b = result, *___tmp;
    if (m % 2 == 1) { // m - 1 is even => copy in result first
       swap(a, b);
    }

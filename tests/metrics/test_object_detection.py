@@ -1,6 +1,6 @@
 import unittest
 import torch
-from metrics.object_detection import iou, generalized_iou, average_precision
+from alm.metrics.object_detection import iou, generalized_iou, average_precision
 
 
 class TestIOU(unittest.TestCase):

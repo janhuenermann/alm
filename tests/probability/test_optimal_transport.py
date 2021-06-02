@@ -1,6 +1,6 @@
 import unittest
 import torch
-from probability.optimal_transport import log_sinkhorn
+from alm.probability.optimal_transport import log_sinkhorn
 
 
 class TestSinkhorn(unittest.TestCase):

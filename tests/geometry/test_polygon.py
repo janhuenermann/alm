@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from geometry.polygon import shoelace, min_rotated_rect, normalize_polygon
+from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon
 
 
 rectangle = np.array([[ -1., -1. ], [ 1., -1. ], [ 1., 1. ], [ -1., 1. ]])
