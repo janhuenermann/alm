@@ -8,7 +8,8 @@ try:
         'native/sutherland_hodgman_gpu.cpp',
         'native/sutherland_hodgman_gpu_kernel.cu'
     ])
-except:
+except Exception as exc:
+    print("Failed to compile CUDA extension: {}".format(exc))
     native_gpu = None
 
 
@@ -16,7 +17,8 @@ try:
     native_cpu = load(name='native_cpu', sources=[
         'native/sutherland_hodgman_cpu.cpp'
     ])
-except:
+except Exception as exc:
+    print("Failed to compile C++ extension: {}".format(exc))
     native_cpu = None
 
 
