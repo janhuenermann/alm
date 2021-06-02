@@ -29,7 +29,7 @@ __global__ void sutherland_hodgman_gpu_kernel(float *result,
       return ;
    }
 
-   float * tmp = new float[2 * out_len];
+   float * tmp = reinterpret_cast<float *>(__nv_aligned_device_malloc(2 * out_len * sizeof(float), 2));
 
    const int result_stride = out_len * 2;
    const int poly1_stride = poly1_len * 2;
@@ -44,7 +44,7 @@ __global__ void sutherland_hodgman_gpu_kernel(float *result,
          poly1_len, poly2_len);
    }
 
-   delete [] tmp;
+   free(reinterpret_cast<void *>(tmp));
 }
 
 Tensor sutherland_hodgman_gpu(const Tensor &poly1, const Tensor &poly2) {

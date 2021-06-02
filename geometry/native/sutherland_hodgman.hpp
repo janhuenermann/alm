@@ -81,8 +81,7 @@ SHARED int64_t polygon_clip(float *result, float *tmp, const float *polygon1, co
       swap(a, b);
    }
 
-   l = edge_clip(b, a, polygon2+2*(m-1), polygon2, l);
-   return l;
+   return edge_clip(b, a, polygon2+2*(m-1), polygon2, l);
 }
 
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf
