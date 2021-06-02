@@ -22,7 +22,7 @@ except:
 
 def convex_convex_intersection(poly1, poly2):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
-    if poly1.is_cuda():
+    if poly1.is_cuda:
         if native_gpu is None:
             raise RuntimeError("Failed to compile CUDA extension for geometry package")
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
