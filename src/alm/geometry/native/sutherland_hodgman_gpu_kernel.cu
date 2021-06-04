@@ -8,16 +8,20 @@
 
 #include "sutherland_hodgman.hpp"
 
+
 using namespace std;
 using namespace torch;
 
-constexpr int num_threads = 2 * C10_WARP_SIZE;
+
+constexpr int num_threads = 4 * C10_WARP_SIZE;
 constexpr int thread_work_size = 1024;
 constexpr int block_work_size = num_threads * thread_work_size;
+
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
+
 
 template <typename scalar_t>
 __global__ void sutherland_hodgman_gpu_kernel(scalar_t *result_data,
@@ -31,68 +35,71 @@ __global__ void sutherland_hodgman_gpu_kernel(scalar_t *result_data,
       return ;
    }
 
-   scalar_t * tmp = reinterpret_cast<scalar_t *>(malloc(2 * out_len * sizeof(scalar_t)));
+   scalar_t * tmp_data = reinterpret_cast<scalar_t *>(malloc(2 * out_len * sizeof(scalar_t)));
    
-   assert(tmp != NULL);
+   assert(tmp_data != NULL);
 
    const int result_stride = out_len * 2;
    const int poly1_stride = poly1_len * 2;
    const int poly2_stride = poly2_len * 2;
-   int64_t npoly;
 
    result_data += index*result_stride;
    poly1_data += index*poly1_stride;
    poly2_data += index*poly2_stride;
 
    for (; index < end; ++index) {
-      npoly = polygon_clip(result_data, tmp, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
-      
-      assert(npoly <= out_len);
+      polygon_clip(result_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
 
       result_data += result_stride;
       poly1_data += poly1_stride;
       poly2_data += poly2_stride;
    }
 
-   free(reinterpret_cast<void *>(tmp));
+   free(reinterpret_cast<void *>(tmp_data));
 }
 
+
 template <typename scalar_t>
-__global__ void compute_intersection_area_gpu_kernel(scalar_t *result_data,
-      const scalar_t *poly1_data, const scalar_t *poly2_data,
-      const int out_count, const int out_len,
-      const int poly1_len, const int poly2_len) {
+__global__ void compute_intersection_area_gpu_kernel(
+   scalar_t *result_data,
+   const scalar_t *poly1_data, const scalar_t *poly2_data,
+   const int out_count, const int out_len,
+   const int poly1_len, const int poly2_len)
+{
    int index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
    const int end = min(index + thread_work_size, out_count);
    if (index >= end) {
       return ;
    }
 
-   scalar_t * tmp = reinterpret_cast<scalar_t *>(malloc(4 * out_len * sizeof(scalar_t)));
+   scalar_t * vertex_data = reinterpret_cast<scalar_t *>(malloc(4 * out_len * sizeof(scalar_t)));
 
-   assert(tmp != NULL);
+   assert(vertex_data != NULL);
+
+   int64_t npoly;
+   scalar_t * tmp_data = vertex_data + out_len * 2;
 
    const int poly1_stride = poly1_len*2;
    const int poly2_stride = poly2_len*2;
-   int64_t npoly;
-
+   
    result_data += index;
    poly1_data += index*poly1_stride;
    poly2_data += index*poly2_stride;
 
    for (; index < end; ++index) {
-      npoly = polygon_clip(tmp, tmp + 2*out_len, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
+      npoly = polygon_clip(vertex_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, out_len);
 
       assert(npoly <= out_len);
 
-      *(result_data++) = shoelace(tmp, npoly);
+      *(result_data++) = shoelace(vertex_data, npoly);
 
       poly1_data += poly1_stride;
       poly2_data += poly2_stride;
    }
 
-   free(reinterpret_cast<void *>(tmp));
+   free(reinterpret_cast<void *>(vertex_data));
 }
+
 
 Tensor sutherland_hodgman_gpu(const Tensor &poly1, const Tensor &poly2) {
    CHECK_INPUT(poly1);
