@@ -1,7 +1,5 @@
-import numpy as np
 import os
 import torch
-from cv2 import convexHull
 from torch.utils.cpp_extension import load
 
 

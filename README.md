@@ -3,4 +3,4 @@ This library implements common computer vision metrics in PyTorch. Algorithms ar
 
 - Mean Average Precision (mAP), Precision-Recall, IoU, GIoU
 - Support for **rotated** bounding boxes
-- **Polygon intersection** on the **GPU**
+- **Convex polygon intersection** on the **GPU** using Sutherland-Hodgman algorithm
