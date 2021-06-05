@@ -143,7 +143,7 @@ SHARED scalar_t shoelace(const scalar_t *polygon, const int64_t &n) {
       area2 -= polygon[2] * polygon[1];
       polygon += 2;
    }
-   return area2 / 2.0F;
+   return abs(area2) / 2.0F;
 }
 
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf

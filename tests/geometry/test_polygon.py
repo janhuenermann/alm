@@ -1,36 +1,44 @@
 import unittest
-import numpy as np
+import torch
 from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon
 
 
-rectangle = np.array([[ -1., -1. ], [ 1., -1. ], [ 1., 1. ], [ -1., 1. ]])
-concave_polygon = np.array([[0., 1.], [0., 2.], [2., 2.], [4., 6.], [6., 3.], [4., 0.], [2., 0.]])
+rectangle = torch.tensor([[ -1., -1. ], [ 1., -1. ], [ 1., 1. ], [ -1., 1. ]])
+convex_polygon = torch.tensor([[0., 1.], [0., 2.], [4., 6.], [6., 3.], [4., 0.], [2., 0.]])
+concave_polygon = torch.tensor([[0., 1.], [0., 2.], [2., 2.], [4., 6.], [6., 3.], [4., 0.], [2., 0.]])
 
 
-class TestPolygon(unittest.TestCase):
+class TestPolygonBasics(unittest.TestCase):
 
     def test_shoelace(self):
         self.assertEqual(shoelace(rectangle), 4.0)
-        self.assertEqual(shoelace(rectangle[::-1]), 4.0)
-        # Repeat interleave
-        self.assertEqual(shoelace(np.repeat(rectangle, 5, 0)), 4.0)
-        # Repeat
-        self.assertEqual(shoelace(np.tile(rectangle, (5, 1)), strict=True), 4.0)
+        self.assertEqual(shoelace(rectangle.flip(-2)), 4.0)
+        self.assertEqual(shoelace(concave_polygon), 17.0)
 
     def test_normalize_cw(self):
-        np.testing.assert_almost_equal(
-            normalize_polygon(rectangle), rectangle)
-        np.testing.assert_almost_equal(
-            normalize_polygon(np.roll(rectangle[::-1], 1, 0)), rectangle)
+        ccw = torch.roll(rectangle.flip(-2), 1, 0)
+        self.assertTrue(torch.allclose(normalize_polygon(rectangle), rectangle))
+        self.assertTrue(torch.allclose(normalize_polygon(ccw), rectangle))
+
+
+class TestRotatedRect(unittest.TestCase):
 
     def test_min_rotated_rect(self):
-        rect = min_rotated_rect(concave_polygon)
-        expected = np.array(
-            [[ 4. ,  6. ],
-             [-0.5,  1.5],
-             [ 2.5, -1.5],
-             [ 7. ,  3. ]])
-        np.testing.assert_almost_equal(rect, expected, 4)
+        rect = min_rotated_rect(convex_polygon)
+        expected = torch.tensor(
+            [[ 2.5, -1.5],
+             [ 7. ,  3. ],
+             [ 4. ,  6. ],
+             [-0.5,  1.5]])
+        self.assertTrue(torch.allclose(rect, expected), (rect, expected))
+
+        # Test batching
+        more_convex_polygon = convex_polygon.expand(100, 10, -1, 2).clone()
+        more_convex_polygon += torch.randn((100, 10, 1, 2)) * 10.
+        more_rect = min_rotated_rect(more_convex_polygon)
+        p0, p1 = more_rect.amin(-2), more_rect.amax(-2)
+        area = (p1 - p0).prod(-1)
+        self.assertTrue(torch.allclose(area, torch.tensor(56.25).expand_as(area)), area)
 
 
 if __name__ == '__main__':

@@ -14,6 +14,6 @@ setuptools.setup(
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.6",
-    package_data={'': ['geometry/native/**/*']},
+    package_data={'': ['./geometry/native/*']},
     include_package_data=True,
 )
