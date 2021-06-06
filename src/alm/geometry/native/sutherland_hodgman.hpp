@@ -63,8 +63,8 @@ SHARED int64_t polygon_clip(
    int64_t l = n, r = m;
 
    // Find padding
-   while (r >= 0 && polygon2[r].is_masked(pad_value)) --r;
-   while (l >= 0 && polygon1[l].is_masked(pad_value)) --l;
+   while (r > 0 && polygon2[r-1].is_masked(pad_value)) --r;
+   while (l > 0 && polygon1[l-1].is_masked(pad_value)) --l;
 
    point<scalar_t> * arr0 = tmp, * arr1 = result, * ___tmp;
 
