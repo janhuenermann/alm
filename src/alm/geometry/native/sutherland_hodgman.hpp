@@ -34,7 +34,7 @@ struct point {
 
 
 template <typename scalar_t>
-bool operator==(const point<scalar_t> & lhs, const point<scalar_t> & rhs) {
+SHARED bool operator==(const point<scalar_t> & lhs, const point<scalar_t> & rhs) {
     return lhs.x == rhs.x && rhs.y == lhs.y;
 }
 
