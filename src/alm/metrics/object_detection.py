@@ -3,6 +3,8 @@ from torch import Tensor
 from torch.nn import functional as F
 from typing import Optional
 
+from alm.geometry.polygon import area_of_intersection, shoelace
+
 
 @torch.jit.script
 def iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
@@ -29,6 +31,15 @@ def iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     area1 = wh1.prod(-1)
     area2 = wh2.prod(-1)
     inter = whi.prod(-1)
+    union = area1 + area2 - inter
+    return inter / (union + eps)
+
+
+#@torch.jit.script
+def convex_polygon_iou(poly1, poly2, eps: float = 0.):
+    area1 = shoelace(poly1)
+    area2 = shoelace(poly2)
+    inter = area_of_intersection(poly1, poly2)
     union = area1 + area2 - inter
     return inter / (union + eps)
 

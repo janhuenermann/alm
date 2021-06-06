@@ -10,12 +10,12 @@ using namespace torch;
 using namespace torch::indexing;
 
 
-Tensor sutherland_hodgman(const Tensor &poly1, const Tensor &poly2) {
+Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
-   out_shape.push_back(out_len);
-   out_shape.push_back(2);
-   torch::Tensor result = at::zeros(out_shape, poly1.options());
+   result_shape.push_back(result_len);
+   result_shape.push_back(2);
+   torch::Tensor result = at::zeros(result_shape, poly1.options());
 
    at::TensorIteratorConfig iter_config;
    auto iter = iter_config
@@ -28,16 +28,18 @@ Tensor sutherland_hodgman(const Tensor &poly1, const Tensor &poly2) {
      .build();
 
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_cpu", [&] {
-      iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
-         scalar_t *tmp_data = reinterpret_cast<scalar_t *>(malloc(4 * out_len * sizeof(scalar_t)));
-         char *result_data = data[0];
-         const char *poly1_data = data[1];
-         const char *poly2_data = data[2];
+      iter.for_each([&](char ** data, const int64_t* strides, int64_t n) {
+         const char * poly1_data = data[1];
+         const char * poly2_data = data[2];
+         char * result_data = data[0];
+         point<scalar_t> * tmp_data = malloc_points(result_len);
          for (int k = 0; k < n; ++k) {
-            polygon_clip(reinterpret_cast<scalar_t *>(result_data), tmp_data, 
-               reinterpret_cast<const scalar_t *>(poly1_data),
-               reinterpret_cast<const scalar_t *>(poly2_data),
-               poly1_len, poly2_len, out_len);
+            polygon_clip(
+               reinterpret_cast<point<scalar_t> *>(result_data),
+               tmp_data,
+               reinterpret_cast<const point<scalar_t> *>(poly1_data),
+               reinterpret_cast<const point<scalar_t> *>(poly2_data),
+               poly1_len, poly2_len, result_len);
             result_data += strides[0];
             poly1_data += strides[1];
             poly2_data += strides[2];
@@ -50,10 +52,10 @@ Tensor sutherland_hodgman(const Tensor &poly1, const Tensor &poly2) {
 }
 
 
-Tensor compute_intersection_area(const Tensor &poly1, const Tensor &poly2) {
+Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
-   torch::Tensor result = at::zeros(out_shape, poly1.options());
+   torch::Tensor result = at::zeros(result_shape, poly1.options());
 
    at::TensorIteratorConfig iter_config;
    auto iter = iter_config
@@ -67,17 +69,18 @@ Tensor compute_intersection_area(const Tensor &poly1, const Tensor &poly2) {
 
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_cpu", [&] {
       iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
-         scalar_t * vertex_data = reinterpret_cast<scalar_t *>(malloc(2 * out_len * sizeof(scalar_t)));
-         scalar_t * tmp_data = vertex_data + 2 * out_len;
-         char * result_data = data[0];
+         point<scalar_t> * vertex_data = malloc_points(2 * result_len); // 2 here is for result and tmp
+         point<scalar_t> * tmp_data = vertex_data + result_len; // 2 here is for x and y
+         int64_t npoly;
          const char * poly1_data = data[1];
          const char * poly2_data = data[2];
-         int64_t npoly;
+         char * result_data = data[0];
          for (int k = 0; k < n; ++k) {
-            npoly = polygon_clip(vertex_data, tmp_data, 
-               reinterpret_cast<const scalar_t *>(poly1_data),
-               reinterpret_cast<const scalar_t *>(poly2_data),
-               poly1_len, poly2_len, out_len);
+            npoly = polygon_clip(
+               vertex_data, tmp_data,
+               reinterpret_cast<const point<scalar_t> *>(poly1_data),
+               reinterpret_cast<const point<scalar_t> *>(poly2_data),
+               poly1_len, poly2_len, result_len);
             result_data[0] = shoelace(vertex_data, npoly);
             result_data += strides[0];
             poly1_data += strides[1];
