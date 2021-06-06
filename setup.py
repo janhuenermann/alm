@@ -13,7 +13,7 @@ setuptools.setup(
     },
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
-    install_requires=["torch>=1.8.0"],
+    install_requires=["torch>=1.8.0", "ninja"],
     python_requires=">=3.6",
     package_data={'': ['./geometry/native/*']},
     include_package_data=True,
