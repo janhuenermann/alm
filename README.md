@@ -6,6 +6,10 @@ This library implements common computer vision metrics in PyTorch. Algorithms ar
 - Mean Average Precision (mAP) of polygons, Precision-Recall, IoU, GIoU
 - Support for **rotated** bounding boxes
 
+<img src="assets/polygon-intersection.svg" width="450" />
+
+> Polygon intersection on the GPU
+
 ## Install
 
 ```bash
