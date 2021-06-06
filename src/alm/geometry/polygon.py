@@ -17,6 +17,12 @@ def get_extension(tensor):
 
 
 def convex_convex_intersection(poly1, poly2):
+    """
+    Returns the intersection of two convex polygon.
+
+    poly1: [*, n, 2]
+    poly2: [*, m, 2]
+    """
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
@@ -24,6 +30,12 @@ def convex_convex_intersection(poly1, poly2):
 
 
 def area_of_intersection(poly1, poly2):
+    """
+    Returns the area of intersection of two polygons
+
+    poly1: [*, n, 2]
+    poly2: [*, m, 2]
+    """
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
