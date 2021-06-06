@@ -33,6 +33,12 @@ struct point {
 };
 
 
+template <typename scalar_t>
+bool operator==(const point<scalar_t> & lhs, const point<scalar_t> & rhs) {
+    return lhs.x == rhs.x && rhs.y == lhs.y;
+}
+
+
 #define malloc_points_no_cast(n) (malloc((n) * sizeof(point<scalar_t>)))
 #define malloc_points(n) (reinterpret_cast<point<scalar_t> *>(malloc_points_no_cast(n)))
 #define point_cast(x) (reinterpret_cast<point<scalar_t> *>(x))
@@ -180,10 +186,14 @@ SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const 
    }
 
    // find the point having the lowest y coordinate (pivot)
+   point<scalar_t> lowest = points[0];
    int64_t lowest_index = 0;
-   for (int64_t i = 1; i < n; ++i)
-      if (points[lowest_index].y > points[i].y)
+   for (int64_t i = 1; i < n; ++i) {
+      if (lowest.y > points[i].y || (lowest.y == points[i].y && lowest.x > points[i].x)) {
          lowest_index = i;
+         lowest = points[i];
+      }
+   }
 
    // make least y the pivot element
    result[0] = lowest_index;
@@ -205,6 +215,10 @@ SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const 
          --m;
       }
       result[m++] = result[i];
+   }
+
+   if (m == 2 && points[result[1]] == points[result[0]]) {
+      m = 1;
    }
 
    for (int64_t i = m; i < n; ++i) {

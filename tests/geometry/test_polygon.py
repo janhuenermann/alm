@@ -3,7 +3,7 @@ import torch
 from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_hull
 
 
-rectangle = torch.tensor([[ -1., -1. ], [ 1., -1. ], [ 1., 1. ], [ -1., 1. ]])
+rectangle = torch.tensor([[ -1., -1. ], [ -1., 1. ], [ 1., 1. ], [ 1., -1. ]])
 convex_polygon = torch.tensor([[0., 1.], [0., 2.], [4., 6.], [6., 3.], [4., 0.], [2., 0.]])
 concave_polygon = torch.tensor([[0., 1.], [0., 2.], [2., 2.], [4., 6.], [6., 3.], [4., 0.], [2., 0.]])
 
@@ -16,9 +16,9 @@ class TestPolygonBasics(unittest.TestCase):
         self.assertEqual(shoelace(concave_polygon), 17.0)
 
     def test_normalize_cw(self):
-        ccw = torch.roll(rectangle.flip(-2), 1, 0)
+        cw = torch.roll(rectangle.flip(-2), 1, 0)
         self.assertTrue(torch.allclose(normalize_polygon(rectangle), rectangle))
-        self.assertTrue(torch.allclose(normalize_polygon(ccw), rectangle))
+        self.assertTrue(torch.allclose(normalize_polygon(cw), rectangle))
 
 
 class TestRotatedRect(unittest.TestCase):
@@ -27,9 +27,9 @@ class TestRotatedRect(unittest.TestCase):
         rect = min_rotated_rect(convex_polygon)
         expected = torch.tensor(
             [[ 2.5, -1.5],
-             [ 7. ,  3. ],
+             [-0.5,  1.5],
              [ 4. ,  6. ],
-             [-0.5,  1.5]])
+             [ 7. ,  3. ]])
         self.assertTrue(torch.allclose(rect, expected), (rect, expected))
 
         # Test batching
@@ -44,8 +44,45 @@ class TestRotatedRect(unittest.TestCase):
 class TestConvexHull(unittest.TestCase):
 
     def test_concave(self):
-        print(convex_hull(concave_polygon))
-        self.assertTrue(True)
+        ch, mask = convex_hull(concave_polygon, return_mask=True)
+        match = [torch.allclose(convex_polygon.roll(i, -2), ch[mask]) for i in range(len(convex_polygon))]
+        self.assertTrue(any(match), (concave_polygon, convex_polygon))
+
+    def test_batching(self):
+        ch = convex_hull(rectangle.expand(100, -1, -1))[0]
+        self.assertTrue(torch.allclose(ch[0], rectangle), (ch, rectangle))
+
+    def test_duplicates(self):
+        # Repeat
+        points = concave_polygon.expand(10, -1, -1).reshape(-1, 2)
+        ch, mask = convex_hull(points, return_mask=True)
+        match = [torch.allclose(convex_polygon.roll(i, -2), ch[mask]) for i in range(len(convex_polygon))]
+        self.assertTrue(any(match), (points, ch))
+
+        # Repeat interleave
+        points = concave_polygon[:, None].expand(-1, 10, -1).reshape(-1, 2)
+        ch, mask = convex_hull(points, return_mask=True)
+        match = [torch.allclose(convex_polygon.roll(i, -2), ch[mask]) for i in range(len(convex_polygon))]
+        self.assertTrue(any(match), (points, ch))
+
+    def test_simple(self):
+        ch = convex_hull(rectangle)[0]
+        self.assertTrue(torch.allclose(ch, rectangle), (ch, rectangle))
+
+        rect_with_interior = torch.cat((rectangle, 2. * torch.rand((100, 2,)) - 1.), -2)
+        ch, mask = convex_hull(rect_with_interior, return_mask=True)
+        self.assertTrue(torch.allclose(ch[mask], rectangle), (ch, rectangle))
+
+    def test_zeros(self):
+        points = torch.zeros((16, 2))
+        ch, mask = convex_hull(points, return_mask=True)
+        self.assertTrue(torch.allclose(ch[mask], torch.tensor([[0., 0.]])))
+
+    def test_colinear(self):
+        points = torch.tensor([[0., 0.], [-5., 0.], [10., 0.], [8., 0.], [1., 1.]])
+        ch, mask = convex_hull(points, return_mask=True)
+        self.assertTrue(mask.sum() == 3)
+        self.assertTrue(torch.allclose(ch[mask], torch.tensor([[-5., 0.], [1., 1.], [10., 0.]])))
 
 
 if __name__ == '__main__':

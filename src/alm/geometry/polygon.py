@@ -63,7 +63,7 @@ def convex_hull(points, pad_value=float('inf'), return_mask=False, return_indice
     return [ch]
 
 
-def normalize_polygon(poly, cw=True):
+def normalize_polygon(poly, cw=False):
     """
     Normalizes polygon to be oriented clockwise in a coordinate system
     where south and east are positive (north and west negative).
