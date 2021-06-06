@@ -21,8 +21,8 @@ Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2) {
 
 
 Tensor convex_hull(const Tensor & poly) {
-   convex_hull_gpu(poly);
-}
+   return convex_hull_gpu(poly);
+};
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

@@ -1,5 +1,7 @@
 import os
+from typing import List
 import torch
+from torch import Tensor
 from torch.utils.cpp_extension import load
 
 
@@ -28,10 +30,25 @@ def area_of_intersection(poly1, poly2):
     return get_extension(poly1).compute_intersection_area(poly1, poly2)
 
 
-def convex_hull(points):
+def convex_hull(points, pad_value=float('inf'), return_mask=False, return_indices=False) -> List[Tensor]:
+    """
+    Returns the convex hull of the given points.
+    Empty points are replaced with pad_value.
+    
+    points: Tensor of shape [*, n, 2]
+    """
     if points.is_cuda:
         points = points.contiguous()
-    return get_extension(points).convex_hull(points)
+    indices = get_extension(points).convex_hull(points)
+    if return_indices:
+        return [indices]
+    # Add dust bin
+    ch = torch.cat((points.new_tensor(pad_value).expand(points.shape[:-2] + (1, 2,)), points), -2)
+    # Gather from indices
+    ch = ch.gather(-2, (indices[..., None] + 1).expand(indices.shape + (2,)))
+    if return_mask:
+        return [ch, indices >= 0]
+    return [ch]
 
 
 def normalize_polygon(poly, cw=True):
@@ -43,7 +60,7 @@ def normalize_polygon(poly, cw=True):
     cw: True to normalize to clockwise, otherwise will normalize to ccw
     """
     p0, p1 = poly, torch.roll(poly, 1, -2)
-    orient = torch.sum((p1[...,0]-p0[...,0]) * (p1[...,1]+p0[...,1]), -1)
+    orient = torch.sum((p1[...,0] - p0[...,0]) * (p1[...,1] + p0[...,1]), -1)
     needs_flip = orient < 0. if cw else orient > 0.
     out = poly.clone()
     out[needs_flip] = torch.roll(poly[needs_flip].flip(-2), 1, -2)

@@ -23,6 +23,9 @@ constexpr int block_work_size = num_threads * thread_work_size;
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
 
+/** -------------- KERNELS -------------- */
+
+
 template <typename scalar_t>
 __global__ void sutherland_hodgman_gpu_kernel(
    point<scalar_t> * result_data,
@@ -68,6 +71,7 @@ __global__ void compute_intersection_area_gpu_kernel(
 {
    int index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
    const int end = min(index + thread_work_size, result_count);
+
    if (index >= end) {
       return ;
    }
@@ -108,10 +112,6 @@ __global__ void convex_hull_gpu_kernel(
    int64_t index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
    const int64_t end = min(index + thread_work_size, result_count);
 
-   if (index >= end) {
-      return ;
-   }
-
    result_data += index*poly_len;
    poly_data += index*poly_len;
 
@@ -121,6 +121,9 @@ __global__ void convex_hull_gpu_kernel(
       poly_data += poly_len;
    }
 }
+
+
+/** -------------- DISPATCHERS -------------- */
 
 
 Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2) {
@@ -133,8 +136,8 @@ Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2) {
 
    result_shape.push_back(result_len);
    result_shape.push_back(2);
-   torch::Tensor result = at::zeros(result_shape, poly1.options());
 
+   torch::Tensor result = at::zeros(result_shape, poly1.options());
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "sutherland_hodgman_gpu", [&] {
       const dim3 blocks((result_count + block_work_size - 1) / block_work_size);
       auto stream = at::cuda::getCurrentCUDAStream();
@@ -161,7 +164,6 @@ Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2)
    int64_t result_count = poly1.numel() / 2 / poly1_len;
 
    torch::Tensor result = at::empty(result_shape, poly1.options());
-
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(result.scalar_type(), "compute_intersection_area_gpu", [&] {
       const dim3 blocks((result_count + block_work_size - 1) / block_work_size);
       auto stream = at::cuda::getCurrentCUDAStream();
@@ -186,18 +188,17 @@ Tensor convex_hull_gpu(const Tensor & poly) {
    TORCH_CHECK(poly.size(-2) > 2, "You provided a tensor with invalid shape. size(-2) must be greater than 2. Here it is ", poly.size(-2), ".");
    TORCH_CHECK(poly.stride(-1) == 1, "Given polygon is not stored in column minor format");
    
+   int64_t poly_len = poly.size(-2);
+   int64_t result_count = poly.numel() / 2 / poly_len;
+
    std::vector<int64_t> result_shape;
    for (int k = 0; k < poly.dim() - 2; ++k) {
       result_shape.push_back(poly.size(k));
    }
 
-   int64_t poly_len = poly.size(-2);
-   int64_t result_count = poly.numel() / 2 / poly_len;
    result_shape.push_back(poly_len);
-   result_shape.push_back(4);
 
    torch::Tensor result = at::empty(result_shape, poly.options().dtype(torch::kInt64));
-
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(poly.scalar_type(), "convex_hull_gpu", [&] {
       const dim3 blocks((result_count + block_work_size - 1) / block_work_size);
       auto stream = at::cuda::getCurrentCUDAStream();

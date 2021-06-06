@@ -162,11 +162,12 @@ SHARED scalar_t shoelace(const point<scalar_t> * polygon, const int64_t & n) {
 
 template <typename scalar_t>
 SHARED inline int ccw(const point<scalar_t> & a, const point<scalar_t> & b, const point<scalar_t> & c) {
-    int area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    return (area < 0) - (area > 0);
+   scalar_t area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+   return (area < 0.0F) - (area > 0.0F);
 }
 
 
+// https://en.wikipedia.org/wiki/Graham_scan
 template <typename scalar_t>
 SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const int64_t & n) {
    if (n <= 2) {
@@ -178,15 +179,11 @@ SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const 
       result[i] = i;
    }
 
-   // find the point having the lowest y coordinate (pivot),
-   // ties are broken in favor of lower x coordinate
+   // find the point having the lowest y coordinate (pivot)
    int64_t lowest_index = 0;
-   for (int64_t i = 1; i < n; ++i) {
-      if (points[lowest_index].y > points[i].y ||
-          (points[lowest_index].y == points[i].y && points[lowest_index].x > points[i].x)) {
+   for (int64_t i = 1; i < n; ++i)
+      if (points[lowest_index].y > points[i].y)
          lowest_index = i;
-      }
-   }
 
    // make least y the pivot element
    result[0] = lowest_index;
@@ -197,25 +194,22 @@ SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const 
    // sort the remaining point according to polar order about the pivot
    sort(result + 1, result + n, [&] (const auto & lhs, const auto & rhs) {
       int order = ccw(pivot, points[lhs], points[rhs]);
-      if (order == -1)
-         return true;
-      if (order == 1)
-         return false;
+      if (order ==  1) return true;
+      if (order == -1) return false;
       return pivot.sq_dist_to(points[lhs]) < pivot.sq_dist_to(points[rhs]);
    });
 
-   int64_t l = 2; // top 3
-   int64_t top_index;
-
-   for (int64_t i = 3; i < n; i++) {
-      const point<scalar_t> & next = points[result[i]];
-      do {
-         top_index = result[l--];
-      } while (ccw(points[result[l]], points[top_index], next) != -1);
-      result[++l] = top_index;
-      result[++l] = result[i];
+   int64_t m = 0;
+   for (int64_t i = 0; i < n; i++) {
+      while (m > 1 && ccw(points[result[m-2]], points[result[m-1]], points[result[i]]) <= 0) {
+         --m;
+      }
+      result[m++] = result[i];
    }
-   // int64_t n = l + 1;
+
+   for (int64_t i = m; i < n; ++i) {
+      result[i] = -1;
+   }
 }
 
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf

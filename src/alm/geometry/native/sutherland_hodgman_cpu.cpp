@@ -121,8 +121,6 @@ Tensor convex_hull(const Tensor & poly) {
      .add_input(poly)
      .build();
 
-   TORCH_CHECK(result.dtype() == torch::kInt64);
-
    AT_DISPATCH_FLOATING_TYPES_AND_HALF(poly.scalar_type(), "convex_hull", [&] {
       iter.for_each([&](char ** data, const int64_t * strides, int64_t n) {
          const char * poly_data = data[1];
