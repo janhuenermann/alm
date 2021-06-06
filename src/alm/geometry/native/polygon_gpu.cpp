@@ -5,18 +5,18 @@
 using namespace torch;
 
 
-Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2);
-Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2);
+Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value);
+Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value);
 Tensor convex_hull_gpu(const Tensor & poly);
 
 
-Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2) {
-   return sutherland_hodgman_gpu(poly1, poly2);
+Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+   return sutherland_hodgman_gpu(poly1, poly2, pad_value);
 };
 
 
-Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2) {
-   return compute_intersection_area_gpu(poly1, poly2);
+Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+   return compute_intersection_area_gpu(poly1, poly2, pad_value);
 };
 
 

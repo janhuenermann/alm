@@ -33,7 +33,7 @@ __global__ void sutherland_hodgman_gpu_kernel(
    const point<scalar_t> * poly1_data,
    const point<scalar_t> * poly2_data,
    const int result_count, const int result_len,
-   const int poly1_len, const int poly2_len)
+   const int poly1_len, const int poly2_len, const scalar_t pad_value)
 {
    int index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
    const int end = min(index + thread_work_size, result_count);
@@ -51,7 +51,7 @@ __global__ void sutherland_hodgman_gpu_kernel(
    poly2_data += index*poly2_len;
 
    for (; index < end; ++index) {
-      polygon_clip(result_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, result_len);
+      polygon_clip(result_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, result_len, pad_value);
 
       result_data += result_len;
       poly1_data += poly1_len;
@@ -68,7 +68,7 @@ __global__ void compute_intersection_area_gpu_kernel(
    const point<scalar_t> * poly1_data,
    const point<scalar_t> * poly2_data,
    const int result_count, const int result_len,
-   const int poly1_len, const int poly2_len)
+   const int poly1_len, const int poly2_len, const scalar_t pad_value)
 {
    int index = thread_work_size * (blockIdx.x * blockDim.x + threadIdx.x);
    const int end = min(index + thread_work_size, result_count);
@@ -89,7 +89,7 @@ __global__ void compute_intersection_area_gpu_kernel(
    poly2_data += index*poly2_len;
 
    for (; index < end; ++index) {
-      npoly = polygon_clip(vertex_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, result_len);
+      npoly = polygon_clip(vertex_data, tmp_data, poly1_data, poly2_data, poly1_len, poly2_len, result_len, pad_value);
 
       assert(npoly <= result_len);
 
@@ -127,7 +127,7 @@ __global__ void convex_hull_gpu_kernel(
 /** -------------- DISPATCHERS -------------- */
 
 
-Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2) {
+Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
    CHECK_INPUT(poly1);
    CHECK_INPUT(poly2);
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
@@ -149,14 +149,15 @@ Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2) {
          result_count,
          result_len,
          poly1_len,
-         poly2_len);
+         poly2_len,
+         (scalar_t) pad_value);
    });
 
    return result;
 }
 
 
-Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2) {
+Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
    CHECK_INPUT(poly1);
    CHECK_INPUT(poly2);
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
@@ -175,7 +176,8 @@ Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2)
          result_count,
          intersection_len,
          poly1_len,
-         poly2_len);
+         poly2_len,
+         (scalar_t) pad_value);
    });
 
    return result;

@@ -29,6 +29,10 @@ struct point {
       return dx*dx + dy*dy;
    }
 
+   bool is_masked(const scalar_t & pad_value) const {
+      return x == pad_value && y == pad_value;
+   }
+
    scalar_t x;
    scalar_t y;
 };

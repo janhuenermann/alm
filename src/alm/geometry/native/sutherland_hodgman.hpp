@@ -53,27 +53,33 @@ template <typename scalar_t>
 SHARED int64_t polygon_clip(
    point<scalar_t> * result, point<scalar_t> * tmp,
    const point<scalar_t> * polygon1, const point<scalar_t> * polygon2,
-   const int64_t & n, const int64_t & m, const int64_t & qmax)
+   const int64_t & n, const int64_t & m, const int64_t & qmax,
+   const scalar_t & pad_value)
 {
    if (m <= 1) {
       return 0;
    }
 
-   int64_t l = n;
+   int64_t l = n, r = m;
+
+   // Find padding
+   while (r >= 0 && polygon2[r].is_masked(pad_value)) --r;
+   while (l >= 0 && polygon1[l].is_masked(pad_value)) --l;
+
    point<scalar_t> * arr0 = tmp, * arr1 = result, * ___tmp;
 
    // For m = 4 (m is even):
    // polygon1 -> tmp, tmp -> result, result -> tmp, tmp -> result
    // For m = 3 (m is odd):
    // polygon1 -> result, result -> tmp, tmp -> result
-   if (m % 2 == 1) {
+   if (r % 2 == 1) {
       swap(arr0, arr1);
    }
 
    // Copy first
-   edge_clip(arr0, polygon1, polygon2[m-1], polygon2[0], l, qmax);
+   edge_clip(arr0, polygon1, polygon2[r-1], polygon2[0], l, qmax);
 
-   for (int i = 1; i < m; ++i, ++polygon2) {
+   for (int i = 1; i < r; ++i, ++polygon2) {
       edge_clip(arr1, arr0, polygon2[0], polygon2[1], l, qmax);
       swap(arr1, arr0);
    }
@@ -81,8 +87,8 @@ SHARED int64_t polygon_clip(
    // Pad with zeros
    result += l;
    for (int64_t i = l; i < qmax; ++i, ++result) {
-      result->x = 0.0F;
-      result->y = 0.0F;
+      result->x = pad_value;
+      result->y = pad_value;
    }
 
    return l;

@@ -11,7 +11,7 @@ using namespace torch;
 using namespace torch::indexing;
 
 
-Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2) {
+Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
    int64_t result_len = get_max_intersection_count(poly1_len, poly2_len);
@@ -42,7 +42,7 @@ Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2) {
                tmp_data,
                reinterpret_cast<const point<scalar_t> *>(poly1_data),
                reinterpret_cast<const point<scalar_t> *>(poly2_data),
-               poly1_len, poly2_len, result_len);
+               poly1_len, poly2_len, result_len, (scalar_t) pad_value);
             result_data += strides[0];
             poly1_data += strides[1];
             poly2_data += strides[2];
@@ -55,7 +55,7 @@ Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2) {
 }
 
 
-Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2) {
+Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
    int64_t result_len = get_max_intersection_count(poly1_len, poly2_len);
@@ -84,7 +84,7 @@ Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2) {
                vertex_data, tmp_data,
                reinterpret_cast<const point<scalar_t> *>(poly1_data),
                reinterpret_cast<const point<scalar_t> *>(poly2_data),
-               poly1_len, poly2_len, result_len);
+               poly1_len, poly2_len, result_len, (scalar_t) pad_value);
             result_data[0] = shoelace(vertex_data, npoly);
             result_data += strides[0];
             poly1_data += strides[1];

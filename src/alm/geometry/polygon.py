@@ -16,7 +16,7 @@ def get_extension(tensor):
         return native_cpu
 
 
-def convex_convex_intersection(poly1, poly2):
+def convex_convex_intersection(poly1, poly2, pad_value=float('inf')):
     """
     Returns the intersection of two convex polygon.
 
@@ -26,10 +26,10 @@ def convex_convex_intersection(poly1, poly2):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-    return get_extension(poly1).sutherland_hodgman(poly1, poly2)
+    return get_extension(poly1).sutherland_hodgman(poly1, poly2, pad_value)
 
 
-def area_of_intersection(poly1, poly2):
+def area_of_intersection(poly1, poly2, pad_value=float('inf')):
     """
     Returns the area of intersection of two polygons
 
@@ -39,7 +39,7 @@ def area_of_intersection(poly1, poly2):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-    return get_extension(poly1).compute_intersection_area(poly1, poly2)
+    return get_extension(poly1).compute_intersection_area(poly1, poly2, pad_value)
 
 
 def convex_hull(points, pad_value=float('inf'), return_mask=False, return_indices=False) -> List[Tensor]:
