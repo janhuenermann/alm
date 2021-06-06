@@ -1,6 +1,6 @@
 import unittest
 import torch
-from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon
+from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_hull
 
 
 rectangle = torch.tensor([[ -1., -1. ], [ 1., -1. ], [ 1., 1. ], [ -1., 1. ]])
@@ -39,6 +39,13 @@ class TestRotatedRect(unittest.TestCase):
         p0, p1 = more_rect.amin(-2), more_rect.amax(-2)
         area = (p1 - p0).prod(-1)
         self.assertTrue(torch.allclose(area, torch.tensor(56.25).expand_as(area)), area)
+
+
+class TestConvexHull(unittest.TestCase):
+
+    def test_concave(self):
+        print(convex_hull(concave_polygon))
+        self.assertTrue(True)
 
 
 if __name__ == '__main__':

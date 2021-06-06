@@ -3,19 +3,29 @@
 #ifndef SUTHERLAND_HODGMAN
 #define SUTHERLAND_HODGMAN
 
-#define swap(x, y) ___tmp = y; y = x; x = ___tmp
-
 #ifdef __CUDACC__
+#include <thrust/sort.h>
 #define SHARED __device__
+#define sort(...) thrust::sort(__VA_ARGS__)
 #else
+#include <algorithm>
 #define SHARED
+#define sort(...) std::sort(__VA_ARGS__)
 #endif
+#include <iostream>
 
+
+#define swap(x, y) ___tmp = y; y = x; x = ___tmp
 
 template <typename scalar_t>
 struct point {
    SHARED point(scalar_t x, scalar_t y) : x(x), y(y) {
       static_assert(sizeof(point<scalar_t>) == 2 * sizeof(scalar_t), "Arch not supported");
+   }
+
+   SHARED scalar_t sq_dist_to(const point<scalar_t> & other) const {
+      scalar_t dx = other.x - x, dy = other.y - y;
+      return dx*dx + dy*dy;
    }
 
    scalar_t x;
@@ -27,6 +37,7 @@ struct point {
 #define malloc_points(n) (reinterpret_cast<point<scalar_t> *>(malloc_points_no_cast(n)))
 #define point_cast(x) (reinterpret_cast<point<scalar_t> *>(x))
 #define const_point_cast(x) (reinterpret_cast<const point<scalar_t> *>(x))
+
 
 template <typename scalar_t>
 SHARED inline bool is_outside(const point<scalar_t> & p, const point<scalar_t> & r, const scalar_t & det_ar) {
@@ -75,17 +86,18 @@ SHARED void edge_clip(
       out_p1 = is_outside(*p1, r, det_ar);
 
       if (out_p0 != out_p1) {
-         intersect(result[m++], a, r, *p0, *p1, det_ar);
+         intersect(result[m], a, r, *p0, *p1, det_ar);
+         ++m;
       }
 
       if (!out_p1) {
          result[m].x = p1->x;
          result[m].y = p1->y;
-         m++;
+         ++m;
       }
 
       p0 = p1;
-      p1++;
+      ++p1;
    }
 
    n = m;
@@ -113,22 +125,19 @@ SHARED int64_t polygon_clip(
       swap(arr0, arr1);
    }
 
-   const point<scalar_t> * p1 = polygon2;
-
    // Copy first
    edge_clip(arr0, polygon1, polygon2[m-1], polygon2[0], l, qmax);
 
-   for (int i = 1; i < m; ++i) {
-      edge_clip(arr1, arr0, *p1, *(++p1), l, qmax);
+   for (int i = 1; i < m; ++i, ++polygon2) {
+      edge_clip(arr1, arr0, polygon2[0], polygon2[1], l, qmax);
       swap(arr1, arr0);
    }
 
    // Pad with zeros
    result += l;
-   for (int64_t i = l; i < qmax; ++i) {
+   for (int64_t i = l; i < qmax; ++i, ++result) {
       result->x = 0.0F;
       result->y = 0.0F;
-      result++;
    }
 
    return l;
@@ -151,62 +160,63 @@ SHARED scalar_t shoelace(const point<scalar_t> * polygon, const int64_t & n) {
 }
 
 
-// template <typename scalar_t>
-// SHARED void graham_scan(bool * result, scalar_t * tmp, const scalar_t * points, const int64_t & n) {
-//    if (n <= 2) {
-//       return 0;
-//    }
+template <typename scalar_t>
+SHARED inline int ccw(const point<scalar_t> & a, const point<scalar_t> & b, const point<scalar_t> & c) {
+    int area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    return (area < 0) - (area > 0);
+}
 
-//    const scalar_t * src, * dst;
-//    const scalar_t * lowestY = tmp;
-//    scalar_t __tmp;
 
-//    // copy over from source array to tmp array (working memory)
-//    src = points;
-//    dst = tmp;
-//    for (int i = 0; i < n; ++i) {
-//       *(dst++) = *(src++);
-//       *(dst++) = *(src++);
-//    }
+template <typename scalar_t>
+SHARED void graham_scan(int64_t * result, const point<scalar_t> * points, const int64_t & n) {
+   if (n <= 2) {
+      return ;
+   }
 
-//    // find the point having the least y coordinate (pivot),
-//    // ties are broken in favor of lower x coordinate
-//    dst = tmp;
-//    for (int i = 1; i < n; ++i, dst += 2) {
-//       if (lowestY[1] > dst[1] || (lowestY[1] == dst[1] && lowestY[0] > dst[0])) {
-//          lowestY = dst;
-//       }
-//    }
+   // init ref list with range zero to n-1
+   for (int i = 0; i < n; ++i) {
+      result[i] = i;
+   }
 
-//    // swap the pivot with the first point
-//    swap(dst[0], leastY[0]);
-//    swap(dst[1], leastY[1]);
-   
-//    // sort the remaining point according to polar order about the pivot
-//    #ifdef __CUDACC__
-//    thrust::sort(tmp, tmp + )
-//    #else
-//    #endif
-//    pivot = points[0];
-//    sort(points + 1, points + N, POLAR_ORDER);
+   // find the point having the lowest y coordinate (pivot),
+   // ties are broken in favor of lower x coordinate
+   int64_t lowest_index = 0;
+   for (int64_t i = 1; i < n; ++i) {
+      if (points[lowest_index].y > points[i].y ||
+          (points[lowest_index].y == points[i].y && points[lowest_index].x > points[i].x)) {
+         lowest_index = i;
+      }
+   }
 
-//    hull.push(points[0]);
-//    hull.push(points[1]);
-//    hull.push(points[2]);
+   // make least y the pivot element
+   result[0] = lowest_index;
+   result[lowest_index] = 0;
 
-//    for (int i = 3; i < N; i++) {
-//    Point top = hull.top();
-//    hull.pop();
-//    while (ccw(hull.top(), top, points[i]) != -1)   {
-//    top = hull.top();
-//    hull.pop();
-//    }
-//    hull.push(top);
-//    hull.push(points[i]);
-//    }
-//    return hull;
+   const point<scalar_t> & pivot = points[lowest_index];
 
-// }
+   // sort the remaining point according to polar order about the pivot
+   sort(result + 1, result + n, [&] (const auto & lhs, const auto & rhs) {
+      int order = ccw(pivot, points[lhs], points[rhs]);
+      if (order == -1)
+         return true;
+      if (order == 1)
+         return false;
+      return pivot.sq_dist_to(points[lhs]) < pivot.sq_dist_to(points[rhs]);
+   });
+
+   int64_t l = 2; // top 3
+   int64_t top_index;
+
+   for (int64_t i = 3; i < n; i++) {
+      const point<scalar_t> & next = points[result[i]];
+      do {
+         top_index = result[l--];
+      } while (ccw(points[result[l]], points[top_index], next) != -1);
+      result[++l] = top_index;
+      result[++l] = result[i];
+   }
+   // int64_t n = l + 1;
+}
 
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf
 int64_t get_max_intersection_count(int64_t p, int64_t q) {
@@ -229,9 +239,7 @@ int64_t get_max_intersection_count(int64_t p, int64_t q) {
       result_shape.push_back(poly1.size(k));\
    }\
    int64_t poly1_len = poly1.size(-2);\
-   int64_t poly2_len = poly2.size(-2);\
-   int64_t result_len = get_max_intersection_count(poly1_len, poly2_len);\
-   int64_t result_count = poly1.numel() / (2 * poly1_len);
+   int64_t poly2_len = poly2.size(-2);
 
 
 

@@ -3,30 +3,35 @@ import torch
 from torch.utils.cpp_extension import load
 
 
-def convex_convex_intersection(poly1, poly2):
-    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
-    if poly1.is_cuda:
+def get_extension(tensor):
+    if tensor.is_cuda:
         if isinstance(native_gpu, str):
             raise RuntimeError("Failed to compile CUDA extension for geometry package: {}".format(native_gpu))
-        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-        return native_gpu.sutherland_hodgman(poly1, poly2)
+        return native_gpu
     else:
         if isinstance(native_cpu, str):
             raise RuntimeError("Failed to compile C++ extension for geometry package: {}".format(native_cpu))
-        return native_cpu.sutherland_hodgman(poly1, poly2)
+        return native_cpu
+
+
+def convex_convex_intersection(poly1, poly2):
+    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
+    if poly1.is_cuda:
+        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
+    return get_extension(poly1).sutherland_hodgman(poly1, poly2)
 
 
 def area_of_intersection(poly1, poly2):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
-        if isinstance(native_gpu, str):
-            raise RuntimeError("Failed to compile CUDA extension for geometry package: {}".format(native_gpu))
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-        return native_gpu.compute_intersection_area(poly1, poly2)
-    else:
-        if isinstance(native_cpu, str):
-            raise RuntimeError("Failed to compile C++ extension for geometry package: {}".format(native_cpu))
-        return native_cpu.compute_intersection_area(poly1, poly2)
+    return get_extension(poly1).compute_intersection_area(poly1, poly2)
+
+
+def convex_hull(points):
+    if points.is_cuda:
+        points = points.contiguous()
+    return get_extension(points).convex_hull(points)
 
 
 def normalize_polygon(poly, cw=True):
