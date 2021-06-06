@@ -129,8 +129,8 @@ native_path = os.path.join(os.path.dirname(__file__), "native")
 
 try:
     source_list = [
-        'sutherland_hodgman_gpu.cpp',
-        'sutherland_hodgman_gpu_kernel.cu'
+        'polygon_gpu.cpp',
+        'polygon_gpu_kernel.cu'
     ]
     native_gpu = load(
         name='native_gpu',
@@ -143,7 +143,7 @@ except Exception as exc:
 
 try:
     source_list = [
-        'sutherland_hodgman_cpu.cpp'
+        'polygon_cpu.cpp'
     ]
     native_cpu = load(
         name='native_cpu',

@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "sutherland_hodgman.hpp"
+#include "graham_scan.hpp"
 
 
 using namespace std;
