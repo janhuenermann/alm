@@ -79,7 +79,7 @@ SHARED int64_t polygon_clip(
    // Copy first
    edge_clip(arr0, polygon1, polygon2[r-1], polygon2[0], l, qmax);
 
-   for (int i = 1; i < r; ++i, ++polygon2) {
+   for (int64_t i = 1; i < r; ++i, ++polygon2) {
       edge_clip(arr1, arr0, polygon2[0], polygon2[1], l, qmax);
       swap(arr1, arr0);
    }

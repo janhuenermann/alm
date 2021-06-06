@@ -1,6 +1,6 @@
 import unittest
 import torch
-from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_hull
+from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_convex_intersection, convex_hull
 
 
 rectangle = torch.tensor([[ -1., -1. ], [ -1., 1. ], [ 1., 1. ], [ 1., -1. ]])
@@ -83,6 +83,21 @@ class TestConvexHull(unittest.TestCase):
         ch, mask = convex_hull(points, return_mask=True)
         self.assertTrue(mask.sum() == 3)
         self.assertTrue(torch.allclose(ch[mask], torch.tensor([[-5., 0.], [1., 1.], [10., 0.]])))
+
+
+class TestConvexConvexIntersection(unittest.TestCase):
+
+    def test_simple(self):
+        inter = convex_convex_intersection(rectangle, rectangle)
+        self.assertTrue(torch.allclose(inter[:4], rectangle))
+
+        inter = convex_convex_intersection(rectangle, rectangle + 1.)
+        self.assertTrue(torch.allclose(inter[:4], torch.tensor([
+            [0., 0.],
+            [0., 1.],
+            [1., 1.],
+            [1., 0.]
+        ])), (inter,))
 
 
 if __name__ == '__main__':

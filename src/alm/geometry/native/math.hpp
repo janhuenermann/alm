@@ -46,7 +46,7 @@ SHARED bool operator==(const point<scalar_t> & lhs, const point<scalar_t> & rhs)
 
 template <typename scalar_t>
 SHARED inline bool is_outside(const point<scalar_t> & p, const point<scalar_t> & r, const scalar_t & det_ar) {
-   return p.x * r.y - p.y * r.x > det_ar;
+   return p.x * r.y - p.y * r.x < det_ar;
 }
 
 
