@@ -63,27 +63,35 @@ SHARED int64_t polygon_clip(
    int64_t l = n, r = m;
 
    // Find padding
-   while (r > 0 && polygon2[r-1].is_masked(pad_value)) --r;
    while (l > 0 && polygon1[l-1].is_masked(pad_value)) --l;
+   while (r > 0 && polygon2[r-1].is_masked(pad_value)) --r;
 
-   point<scalar_t> * arr0 = tmp, * arr1 = result, * ___tmp;
+   // Only clip if each polygon has at least two vertices
+   if (r > 1 && l > 1) {
+      point<scalar_t> * arr0 = tmp, * arr1 = result, * ___tmp;
 
-   // For m = 4 (m is even):
-   // polygon1 -> tmp, tmp -> result, result -> tmp, tmp -> result
-   // For m = 3 (m is odd):
-   // polygon1 -> result, result -> tmp, tmp -> result
-   if (r % 2 == 1) {
-      swap(arr0, arr1);
+      // For m = 4 (m is even):
+      // polygon1 -> tmp, tmp -> result, result -> tmp, tmp -> result
+      // For m = 3 (m is odd):
+      // polygon1 -> result, result -> tmp, tmp -> result
+      if (r % 2 == 1) {
+         swap(arr0, arr1);
+      }
+
+      // Copy first
+      edge_clip(arr0, polygon1, polygon2[r-1], polygon2[0], l, qmax);
+
+      // Now go around the polygon,
+      // swapping tmp and result at every iteration
+      for (int64_t i = 1; i < r; ++i, ++polygon2) {
+         edge_clip(arr1, arr0, polygon2[0], polygon2[1], l, qmax);
+         swap(arr1, arr0);
+      }
    }
-
-   // Copy first
-   edge_clip(arr0, polygon1, polygon2[r-1], polygon2[0], l, qmax);
-
-   for (int64_t i = 1; i < r; ++i, ++polygon2) {
-      edge_clip(arr1, arr0, polygon2[0], polygon2[1], l, qmax);
-      swap(arr1, arr0);
-   }
-
+   else {
+      l = 0;
+   } 
+   
    // Pad with zeros
    result += l;
    for (int64_t i = l; i < qmax; ++i, ++result) {

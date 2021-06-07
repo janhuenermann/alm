@@ -76,6 +76,12 @@ class TestRotatedIOU(unittest.TestCase):
       result = iou(boxes3, boxes5, "xywha")
       self.assertTrue(torch.allclose(result, torch.tensor(1. / sqrt(2))), (result,))
 
+   def test_stability(self):
+      boxes1 = torch.tensor([0., 0., 2., 1., 0.])
+      boxes2 = torch.tensor([0., 0., 2., 1., 1e-5])
+
+      result = iou(boxes1, boxes2, "xywha")
+      self.assertTrue(torch.allclose(result, torch.tensor(1.), 1e-4), (result,))
 
 class TestAP(unittest.TestCase):
 
