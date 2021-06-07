@@ -1,14 +1,14 @@
 import unittest
 import torch
-from alm.metrics.object_detection import iou, generalized_iou, average_precision
+from alm.metrics.object_detection import box_iou, generalized_box_iou, average_precision
 
 
-class TestIOU(unittest.TestCase):
+class TestBoxIOU(unittest.TestCase):
 
    def test_iou(self):
       boxes1 = torch.tensor([0., 0., 1., 1.])
       boxes2 = torch.tensor([0.5, 0.5, 1., 1.])
-      result = iou(boxes1, boxes2)
+      result = box_iou(boxes1, boxes2)
 
       self.assertEqual(result.shape, tuple())
       self.assertEqual(result.item(), 0.25)
@@ -20,7 +20,7 @@ class TestIOU(unittest.TestCase):
          [-1.0, -1.0, 2., 2.],
          [0., 0., 1., 1.]
       ])
-      result = iou(boxes1[None, :], boxes2)
+      result = box_iou(boxes1[None, :], boxes2)
 
       expected = [0., 0., 1./9., 1.]
       for result_i, expected_i in zip(result, expected):
@@ -29,7 +29,7 @@ class TestIOU(unittest.TestCase):
    def test_giou(self):
       boxes1 = torch.tensor([0., 0., 1., 1.])
       boxes2 = torch.tensor([0.5, 0.5, 1., 1.])
-      result = generalized_iou(boxes1, boxes2)
+      result = generalized_box_iou(boxes1, boxes2)
 
       self.assertEqual(result.shape, tuple())
       self.assertEqual(result.item(), 0.25)
@@ -41,7 +41,7 @@ class TestIOU(unittest.TestCase):
          [-1.0, -1.0, 2., 2.],
          [0., 0., 1., 1.]
       ])
-      result = generalized_iou(boxes1[None, :], boxes2)
+      result = generalized_box_iou(boxes1[None, :], boxes2)
 
       expected = [-0.5, -1/6.05, 1./9., 1.]
       for result_i, expected_i in zip(result, expected):
