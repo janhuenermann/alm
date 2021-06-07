@@ -96,9 +96,7 @@ SHARED int64_t polygon_clip(
 
 
 // For bound, see https://resources.mpi-inf.mpg.de/departments/d1/teaching/ws09_10/CGGC/Notes/Polygons.pdf
-int64_t get_max_intersection_count(int64_t p, int64_t q) {
-   return std::min(2 * p, 2 * q);
-}
+int64_t get_max_intersection_count(int64_t p, int64_t q);
 
 
 // Check input format and shapes

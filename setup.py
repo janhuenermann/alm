@@ -6,12 +6,15 @@ ext_modules = []
 
 try:
     ext_modules.append(CUDAExtension('alm_ext_gpu', [
-        "src/alm/ext/polygon_cpu.cpp",
         "src/alm/ext/polygon_gpu.cpp",
+        "src/alm/ext/polygon_cpu_kernel.cpp",
         "src/alm/ext/polygon_gpu_kernel.cu",
     ]))
 except OSError:
-    ext_modules.append(CppExtension('alm_ext_cpu', ["src/alm/ext/polygon_cpu.cpp"]))
+    ext_modules.append(CppExtension('alm_ext_cpu', [
+        "src/alm/ext/polygon_cpu.cpp",
+        "src/alm/ext/polygon_cpu_kernel.cpp"
+    ]))
 
 
 setuptools.setup(

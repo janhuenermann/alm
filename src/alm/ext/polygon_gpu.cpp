@@ -16,7 +16,7 @@ Tensor convex_hull_cpu(const Tensor & poly);
 
 
 Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
-   if (poly1.is_cuda) {
+   if (poly1.is_cuda()) {
       return sutherland_hodgman_gpu(poly1, poly2, pad_value);
    }
    return sutherland_hodgman_cpu(poly1, poly2, pad_value);
@@ -24,7 +24,7 @@ Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const doub
 
 
 Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
-   if (poly1.is_cuda) {
+   if (poly1.is_cuda()) {
       return compute_intersection_area_gpu(poly1, poly2, pad_value);
    }
    return compute_intersection_area_cpu(poly1, poly2, pad_value);
@@ -32,7 +32,7 @@ Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, con
 
 
 Tensor convex_hull(const Tensor & poly) {
-   if (poly.is_cuda) {
+   if (poly.is_cuda()) {
       return convex_hull_gpu(poly);
    }
    return convex_hull_cpu(poly);
