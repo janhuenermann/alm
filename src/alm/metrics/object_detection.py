@@ -171,8 +171,8 @@ def compute_true_positives(labels, predictions, confidence,
 
 
 @torch.jit.script
-def get_precision_recall_from_tp(trues, positives, confidence: Optional[Tensor] = None,
-                                            image_dim: Optional[int] = None):
+def precision_recall_from_tp(trues, positives, confidence: Optional[Tensor] = None,
+                             image_dim: Optional[int] = None):
     """
     Computes the precision recall curve from
     trues (shape [*, m]), positive counts (shape [*]),
@@ -207,7 +207,7 @@ def get_precision_recall_from_tp(trues, positives, confidence: Optional[Tensor] 
 
 
 @torch.jit.script
-def get_average_precision_from_pr(precision, recall, interpolation_points: Optional[int] = None):
+def average_precision_from_pr(precision, recall, interpolation_points: Optional[int] = None):
     """
     Computes the average precision (AP) from precision and recall.
 
@@ -253,17 +253,17 @@ def precision_recall(labels, predictions, confidence,
     trues, positives, confidence = compute_true_positives(
         labels, predictions, confidence, labels_mask, predictions_mask, iou_threshold, tensor_format)
 
-    return get_precision_recall_from_tp(trues, positives, confidence, image_dim)
+    return precision_recall_from_tp(trues, positives, confidence, image_dim)
 
 
 @torch.jit.script
 def average_precision(labels, predictions, confidence,
-                             labels_mask: Optional[Tensor] = None,
-                             predictions_mask: Optional[Tensor] = None,
-                             image_dim: Optional[int] = None,
-                             iou_threshold: float = 0.5,
-                             interpolation_points: Optional[int] = None,
-                             tensor_format: str = "xyxy"):
+                      labels_mask: Optional[Tensor] = None,
+                      predictions_mask: Optional[Tensor] = None,
+                      image_dim: Optional[int] = None,
+                      iou_threshold: float = 0.5,
+                      interpolation_points: Optional[int] = None,
+                      tensor_format: str = "xyxy"):
     """
     Computes the average precision (AP) given
     predictions and labels. If `image_dim` is set, aggregates
@@ -282,4 +282,4 @@ def average_precision(labels, predictions, confidence,
     precision, recall = precision_recall(labels, predictions, confidence,
         labels_mask, predictions_mask, image_dim, iou_threshold, tensor_format)
 
-    return get_average_precision_from_pr(precision, recall)
+    return average_precision_from_pr(precision, recall)

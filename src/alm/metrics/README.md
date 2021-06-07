@@ -7,8 +7,8 @@ Example of computing average precision in _PyTorch Lightning_:
 ```python
 
 import pytorch_lightning as pl
-from alm.metrics.object_detection import get_true_positives, get_precision_recall_from_tp, \
-   get_average_precision_from_pr
+from alm.metrics.object_detection import get_true_positives, precision_recall_from_tp, \
+   average_precision_from_pr
 
 class ObjectDetector(pl.LightningModule):
 
@@ -44,9 +44,9 @@ class ObjectDetector(pl.LightningModule):
       trues, positives, conf = \
          (torch.cat([out[key] for out in outputs]) for key in ("trues", "positives", "conf"))
       # Compute precision recall
-      precision, recall = get_precision_recall_from_tp(trues, positives, conf, image_dim=0)
+      precision, recall = precision_recall_from_tp(trues, positives, conf, image_dim=0)
       # Get AP
-      ap = get_average_precision_from_pr(precision, recall)
+      ap = average_precision_from_pr(precision, recall)
       # Log
       self.log("val/AP", ap)
 
