@@ -116,21 +116,3 @@ def shoelace(poly):
     s1 = (poly[...,0]*rpoly[...,1]).sum(-1, False)
     s2 = (poly[...,1]*rpoly[...,0]).sum(-1, False)
     return (s1 - s2).abs() / 2.
-
-
-
-
-try:
-    source_list = [
-        'polygon_gpu.cpp',
-        'polygon_gpu_kernel.cu'
-    ]
-    native_gpu = load(
-        name='native_gpu',
-        extra_cuda_cflags=["-Xptxas -O3 -Xnvlink -O3"],
-        extra_ldflags=["-O3"],
-        sources=[os.path.join(native_path, source) for source in source_list])
-except Exception as exc:
-    native_gpu = "{}".format(exc)
-
-
