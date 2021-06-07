@@ -66,6 +66,7 @@ def generalized_box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     return inter / (union + eps) + union / (outer + eps) - 1.
 
 
+@torch.jit.script
 def convex_iou(poly1, poly2, eps: float = 0.):
     """
     Intersection over Union (IoU) of two ccw-oriented
@@ -92,10 +93,12 @@ def rotation_basis(angle):
 @torch.jit.script
 def xywha_to_4xy(xywha):
     T = torch.tensor([
-        [-1, -1,  1,  1],
-        [-1,  1,  1, -1]], device=xywha.device, dtype=xywha.dtype)
-    basis = xywha[..., None, 2:4] / 2. * rotation_basis(xywha[..., 4])
-    return xywha[..., :2] + torch.matmul(basis, T.expand(basis.shape[:-1] + (-1,)))
+        [-1, -1],
+        [-1,  1],
+        [ 1,  1],
+        [ 1, -1]], device=xywha.device, dtype=xywha.dtype)
+    basis = xywha[..., 2:4, None] / 2. * rotation_basis(xywha[..., 4])
+    return xywha[..., :2] + torch.matmul(T.expand(basis.shape[:-2] + (-1, -1,)), basis)
 
 
 @torch.jit.script

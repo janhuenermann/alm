@@ -1,6 +1,7 @@
 import unittest
 import torch
-from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_convex_intersection, convex_hull
+from alm.geometry.polygon import shoelace, min_rotated_rect, normalize_polygon, convex_convex_intersection,\
+    convex_hull, area_of_intersection
 
 
 rectangle = torch.tensor([[ -1., -1. ], [ -1., 1. ], [ 1., 1. ], [ 1., -1. ]])
@@ -98,6 +99,21 @@ class TestConvexConvexIntersection(unittest.TestCase):
             [1., 1.],
             [1., 0.]
         ])), (inter,))
+
+
+    def test_intersection_area(self):
+        A = torch.tensor([
+                [-1.0000, -0.5000],
+                [-1.0000,  0.5000],
+                [ 1.0000,  0.5000],
+                [ 1.0000, -0.5000]])
+        B = torch.tensor([
+                [-0.5000,  1.0000],
+                [ 0.5000,  1.0000],
+                [ 0.5000, -1.0000],
+                [-0.5000, -1.0000]])
+        area = area_of_intersection(A, B)
+        self.assertTrue(torch.allclose(area, torch.tensor(1.)), (area,))
 
 
 if __name__ == '__main__':

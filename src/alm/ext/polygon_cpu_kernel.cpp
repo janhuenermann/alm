@@ -85,7 +85,7 @@ Tensor compute_intersection_area_cpu(const Tensor & poly1, const Tensor & poly2,
                reinterpret_cast<const point<scalar_t> *>(poly1_data),
                reinterpret_cast<const point<scalar_t> *>(poly2_data),
                poly1_len, poly2_len, result_len, (scalar_t) pad_value);
-            result_data[0] = shoelace(vertex_data, npoly);
+            *reinterpret_cast<scalar_t *>(result_data) = shoelace(vertex_data, npoly);
             result_data += strides[0];
             poly1_data += strides[1];
             poly2_data += strides[2];
