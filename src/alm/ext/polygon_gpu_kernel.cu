@@ -127,7 +127,7 @@ __global__ void convex_hull_gpu_kernel(
 /** -------------- DISPATCHERS -------------- */
 
 
-Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
    CHECK_INPUT(poly1);
    CHECK_INPUT(poly2);
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
@@ -157,7 +157,7 @@ Tensor sutherland_hodgman_gpu(const Tensor & poly1, const Tensor & poly2, const 
 }
 
 
-Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+Tensor compute_intersection_area_gpu(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
    CHECK_INPUT(poly1);
    CHECK_INPUT(poly2);
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);

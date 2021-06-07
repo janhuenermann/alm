@@ -2,23 +2,30 @@ import os
 from typing import List
 import torch
 from torch import Tensor
-from torch.utils.cpp_extension import load
 
 
-def get_extension(tensor):
-    if tensor.is_cuda:
-        if isinstance(native_gpu, str):
-            raise RuntimeError("Failed to compile CUDA extension for geometry package: {}".format(native_gpu))
-        return native_gpu
-    else:
-        if isinstance(native_cpu, str):
-            raise RuntimeError("Failed to compile C++ extension for geometry package: {}".format(native_cpu))
-        return native_cpu
-
-
-def convex_convex_intersection(poly1, poly2, pad_value=float('inf')):
+def convex_convex_intersection(poly1, poly2, pad_value: float = float('inf')):
     """
     Returns the intersection of two convex polygon.
+    Both polygons **must** be oriented counter-clockwise
+    in south-east positive coordinate system, e.g.
+    [(-1, -1), (-1, 1), (1, 1), (1, -1)] is ccw.
+ 
+    poly1: [*, n, 2]
+    poly2: [*, m, 2]
+    """
+    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
+    if poly1.is_cuda:
+        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
+    return torch.ops.alm_ext.sutherland_hodgman(poly1, poly2, pad_value)
+
+
+def area_of_intersection(poly1, poly2, pad_value: float = float('inf')):
+    """
+    Returns the area of intersection of two polygons.
+    Both polygons **must** be oriented counter-clockwise
+    in south-east positive coordinate system, e.g.
+    [(-1, -1), (-1, 1), (1, 1), (1, -1)] is ccw.
 
     poly1: [*, n, 2]
     poly2: [*, m, 2]
@@ -26,23 +33,10 @@ def convex_convex_intersection(poly1, poly2, pad_value=float('inf')):
     poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
     if poly1.is_cuda:
         poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-    return get_extension(poly1).sutherland_hodgman(poly1, poly2, pad_value)
+    return torch.ops.alm_ext.compute_intersection_area(poly1, poly2, pad_value)
 
 
-def area_of_intersection(poly1, poly2, pad_value=float('inf')):
-    """
-    Returns the area of intersection of two polygons
-
-    poly1: [*, n, 2]
-    poly2: [*, m, 2]
-    """
-    poly1, poly2 = torch.broadcast_tensors(poly1, poly2)
-    if poly1.is_cuda:
-        poly1, poly2 = poly1.contiguous(), poly2.contiguous()
-    return get_extension(poly1).compute_intersection_area(poly1, poly2, pad_value)
-
-
-def convex_hull(points, pad_value=float('inf'), return_mask=False, return_indices=False) -> List[Tensor]:
+def convex_hull(points, pad_value: float = float('inf'), return_mask: bool = False, return_indices: bool = False) -> List[Tensor]:
     """
     Returns the convex hull of the given points.
     Empty points are replaced with pad_value.
@@ -51,7 +45,7 @@ def convex_hull(points, pad_value=float('inf'), return_mask=False, return_indice
     """
     if points.is_cuda:
         points = points.contiguous()
-    indices = get_extension(points).convex_hull(points)
+    indices = torch.ops.alm_ext.convex_hull(points)
     if return_indices:
         return [indices]
     # Add dust bin
@@ -124,7 +118,6 @@ def shoelace(poly):
     return (s1 - s2).abs() / 2.
 
 
-native_path = os.path.join(os.path.dirname(__file__), "native")
 
 
 try:
@@ -141,16 +134,3 @@ except Exception as exc:
     native_gpu = "{}".format(exc)
 
 
-try:
-    source_list = [
-        'polygon_cpu.cpp'
-    ]
-    native_cpu = load(
-        name='native_cpu',
-        extra_cflags=["-O3"],
-        extra_ldflags=["-O3"],
-        sources=[os.path.join(native_path, source) for source in source_list])
-except Exception as exc:
-    raise exc
-    print("Failed to compile C++ extension for geometry package: {}".format(exc))
-    native_cpu = "{}".format(exc)

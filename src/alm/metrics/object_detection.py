@@ -7,7 +7,7 @@ from alm.geometry.polygon import area_of_intersection, shoelace
 
 
 @torch.jit.script
-def iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
+def box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     """
     Intersection over Union (IoU).
 
@@ -24,8 +24,8 @@ def iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     whi = mins[..., 2:]   - maxs[..., :2]
 
     if strict:
-     wh1.clamp_(min=0)
-     wh2.clamp_(min=0)
+        wh1.clamp_(min=0)
+        wh2.clamp_(min=0)
     whi.clamp_(min=0)
 
     area1 = wh1.prod(-1)
@@ -35,18 +35,9 @@ def iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     return inter / (union + eps)
 
 
-#@torch.jit.script
-def convex_polygon_iou(poly1, poly2, eps: float = 0.):
-    area1 = shoelace(poly1)
-    area2 = shoelace(poly2)
-    inter = area_of_intersection(poly1, poly2)
-    union = area1 + area2 - inter
-    return inter / (union + eps)
-
-
 # From https://gist.github.com/janhuenermann/9410805647a3fb1521f1b754360eeefe
 @torch.jit.script
-def generalized_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
+def generalized_box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     """
     Generalized IoU (https://giou.stanford.edu/)
 
@@ -75,6 +66,23 @@ def generalized_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     return inter / (union + eps) + union / (outer + eps) - 1.
 
 
+def convex_iou(poly1, poly2, eps: float = 0.):
+    """
+    Intersection over Union (IoU) of two ccw-oriented
+    convex polygons.
+
+    poly1: [*, n, 2]
+    poly2: [*, m, 2]
+    ---
+    returns: [*]
+    """
+    area1 = shoelace(poly1)
+    area2 = shoelace(poly2)
+    inter = area_of_intersection(poly1, poly2)
+    union = area1 + area2 - inter
+    return inter / (union + eps)
+
+
 @torch.jit.script
 def rotation_basis(angle):
     c, s = angle.cos(), angle.sin()
@@ -82,29 +90,16 @@ def rotation_basis(angle):
 
 
 @torch.jit.script
-def project_rotated_bboxes(labels, predictions):
-    assert labels.size(-1) == 5 and predictions.size(-1) == 5
-
-    # Project both bboxes to common rotation basis
-    basis, rel_basis = rotation_basis(labels[..., 4]), rotation_basis(labels[..., 4] - predictions[..., 4])
-
-    # Rotate label box
-    proj_labels = torch.empty(labels.shape[:-1] + (4,), device=labels.device, dtype=labels.dtype)
-    proj_labels[..., :2] = torch.matmul(labels[..., None, :2].to(basis), basis).squeeze(-2) - labels[..., 2:4] / 2.
-    proj_labels[..., 2:] = proj_labels[..., :2] + labels[..., 2:4]
-
-    # Rotate prediction the same way
-    proj_pred_xy = torch.matmul(predictions[..., None, :2].to(basis), basis).squeeze(-2)
-    proj_pred_dx, proj_pred_dy = (predictions[..., None, 2:4] * rel_basis).unbind(-2)
-    proj_pred_size = proj_pred_dx.abs() + proj_pred_dy.abs()
-    proj_pred = torch.cat((proj_pred_xy - proj_pred_size / 2.,
-                                  proj_pred_xy + proj_pred_size / 2.), -1)
-
-    return proj_labels, proj_pred
+def xywha_to_4xy(xywha):
+    T = torch.tensor([
+        [-1, -1,  1,  1],
+        [-1,  1,  1, -1]], device=xywha.device, dtype=xywha.dtype)
+    basis = xywha[..., None, 2:4] / 2. * rotation_basis(xywha[..., 4])
+    return xywha[..., :2] + torch.matmul(basis, T.expand(basis.shape[:-1] + (-1,)))
 
 
 @torch.jit.script
-def iou_with_format(labels, predictions, bbox_format: str = "xyxy"):
+def iou(labels, predictions, tensor_format: str = "xyxy"):
     """
     Returns the IOU of label and prediction. The format of the bounding boxes
     can be specified with the bbox_format parameter, which is either
@@ -117,24 +112,22 @@ def iou_with_format(labels, predictions, bbox_format: str = "xyxy"):
     Returns IOU in shape [*]
     """
     assert predictions.size(-1) == labels.size(-1)
-    if bbox_format == "xyxy":
+    if tensor_format == "xyxy":
         assert labels.size(-1) == 4
-        return iou(labels, predictions)
-    elif bbox_format == "xywha":
-        # This format supports rotated bounding boxes
+        return box_iou(labels, predictions)
+    elif tensor_format == "xywha":
         assert labels.size(-1) == 5
-        proj_labels, proj_pred = project_rotated_bboxes(labels, predictions)
-        return iou(proj_labels, proj_pred)
+        return convex_iou(xywha_to_4xy(labels), xywha_to_4xy(predictions))
     else:
-        raise RuntimeError("Unrecognized bbox format: {}".format(bbox_format))
+        raise RuntimeError("Unrecognized tensor format: {}".format(tensor_format))
 
 
 @torch.jit.script
 def compute_true_positives(labels, predictions, confidence,
-                                    labels_mask: Optional[Tensor] = None,
-                                    predictions_mask: Optional[Tensor] = None,
-                                    iou_threshold: float = 0.5,
-                                    bbox_format: str = "xyxy"):
+                           labels_mask: Optional[Tensor] = None,
+                           predictions_mask: Optional[Tensor] = None,
+                           iou_threshold: float = 0.5,
+                           tensor_format: str = "xyxy"):
     """
     Returns tuple of trues (shape [*, m]), positives (shape [*]), and confidence (sorted, shape [*, m]).
 
@@ -144,7 +137,7 @@ def compute_true_positives(labels, predictions, confidence,
     labels_mask: Boolean mask of labels with shape [*, n]
     predictions_mask: Boolean mask of predictions with shape [*, m]
     iou_threshold: Threshold of IOU. Predictions with IOU > threshold to labels will be regarded as true positives
-    bbox_format: Format of bboxes, either 'xyxy' or 'xywha'
+    tensor_format: Format of predictions/labels, either 'xyxy' or 'xywha'
     """
     confidence, perm = confidence.sort(-1, descending=True)
     predictions = predictions.gather(-2, perm.unsqueeze(-1).expand_as(predictions))
@@ -152,7 +145,7 @@ def compute_true_positives(labels, predictions, confidence,
     if predictions_mask is not None:
         predictions_mask = predictions_mask.gather(-1, perm)
 
-    _ious = iou_with_format(labels[..., :, None, :], predictions[..., None, :, :], bbox_format=bbox_format)
+    _ious = iou(labels[..., :, None, :], predictions[..., None, :, :], tensor_format=tensor_format)
     if labels_mask is not None:
         _ious.masked_fill_(~labels_mask.unsqueeze(-1), 0.)
     if predictions_mask is not None:
@@ -235,11 +228,11 @@ def get_average_precision_from_pr(precision, recall, interpolation_points: Optio
 
 @torch.jit.script
 def precision_recall(labels, predictions, confidence,
-                            labels_mask: Optional[Tensor] = None,
-                            predictions_mask: Optional[Tensor] = None,
-                            image_dim: Optional[int] = None,
-                            iou_threshold: float = 0.5,
-                            bbox_format: str = "xyxy"):
+                     labels_mask: Optional[Tensor] = None,
+                     predictions_mask: Optional[Tensor] = None,
+                     image_dim: Optional[int] = None,
+                     iou_threshold: float = 0.5,
+                     tensor_format: str = "xyxy"):
     """
     Computes the precision-recall curve (P-R curve) given
     predictions and labels. If `image_dim` is set, aggregates
@@ -252,10 +245,10 @@ def precision_recall(labels, predictions, confidence,
     predictions_mask: Boolean mask of predictions with shape [*, m]
     image_dim: Dimension of each image (e.g. -2); -1 refers to bbox dimension, therefore it must be different
     iou_threshold: Threshold of IOU. Predictions with IOU > threshold to labels will be regarded as true positives
-    bbox_format: Format of bboxes, either 'xyxy' or 'xywha'
+    tensor_format: Format of predictions/labels, either 'xyxy' or 'xywha'
     """
     trues, positives, confidence = compute_true_positives(
-        labels, predictions, confidence, labels_mask, predictions_mask, iou_threshold, bbox_format)
+        labels, predictions, confidence, labels_mask, predictions_mask, iou_threshold, tensor_format)
 
     return get_precision_recall_from_tp(trues, positives, confidence, image_dim)
 
@@ -267,7 +260,7 @@ def average_precision(labels, predictions, confidence,
                              image_dim: Optional[int] = None,
                              iou_threshold: float = 0.5,
                              interpolation_points: Optional[int] = None,
-                             bbox_format: str = "xyxy"):
+                             tensor_format: str = "xyxy"):
     """
     Computes the average precision (AP) given
     predictions and labels. If `image_dim` is set, aggregates
@@ -281,9 +274,9 @@ def average_precision(labels, predictions, confidence,
     image_dim: Dimension of each image (e.g. -2); -1 refers to bbox dimension, therefore it must be different
     iou_threshold: Threshold of IOU. Predictions with IOU > threshold to labels will be regarded as true positives
     interpolation_points: Number of interpolation points of P-R-Curve. If None, will not interpolate and integrate whole curve (default).
-    bbox_format: Format of bboxes, either 'xyxy' or 'xywha'
+    tensor_format: Format of predictions/labels, either 'xyxy' or 'xywha'
     """
     precision, recall = precision_recall(labels, predictions, confidence,
-        labels_mask, predictions_mask, image_dim, iou_threshold, bbox_format)
+        labels_mask, predictions_mask, image_dim, iou_threshold, tensor_format)
 
     return get_average_precision_from_pr(precision, recall)

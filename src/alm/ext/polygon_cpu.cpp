@@ -11,7 +11,7 @@ using namespace torch;
 using namespace torch::indexing;
 
 
-Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+Tensor sutherland_hodgman_cpu(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
    int64_t result_len = get_max_intersection_count(poly1_len, poly2_len);
@@ -55,7 +55,7 @@ Tensor sutherland_hodgman(const Tensor & poly1, const Tensor & poly2, const floa
 }
 
 
-Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, const float pad_value) {
+Tensor compute_intersection_area_cpu(const Tensor & poly1, const Tensor & poly2, const double pad_value) {
    CHECK_INPUT_POLY_AND_PREPARE(poly1, poly2);
 
    int64_t result_len = get_max_intersection_count(poly1_len, poly2_len);
@@ -98,7 +98,7 @@ Tensor compute_intersection_area(const Tensor & poly1, const Tensor & poly2, con
 }
 
 
-Tensor convex_hull(const Tensor & poly) {
+Tensor convex_hull_cpu(const Tensor & poly) {
    TORCH_CHECK(poly.dim() >= 2, "Polygon tensors must have dim >= 2.");
    TORCH_CHECK(poly.size(-1) == 2, "You provided a tensor with invalid shape. size(-1) must be 2. Here it is ", poly.size(-1), ".");
    TORCH_CHECK(poly.size(-2) > 2, "You provided a tensor with invalid shape. size(-2) must be greater than 2. Here it is ", poly.size(-2), ".");
@@ -141,8 +141,15 @@ Tensor convex_hull(const Tensor & poly) {
 }
 
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-   m.def("sutherland_hodgman", &sutherland_hodgman, "Sutherland Hodgman Polygon Clipping Forward Pass");
-   m.def("compute_intersection_area", &compute_intersection_area, "Computer Area of Intersection of Two Polygons");
-   m.def("convex_hull", &convex_hull, "Convex Hull of 2D Points");
+TORCH_LIBRARY(alm_ext, m) {
+  m.def("sutherland_hodgman", &sutherland_hodgman_cpu);
+  m.def("compute_intersection_area", &compute_intersection_area_cpu);
+  m.def("convex_hull", &convex_hull_cpu);
 }
+
+
+// PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+//    m.def("sutherland_hodgman", &sutherland_hodgman, "Sutherland Hodgman Polygon Clipping Forward Pass");
+//    m.def("compute_intersection_area", &compute_intersection_area, "Computer Area of Intersection of Two Polygons");
+//    m.def("convex_hull", &convex_hull, "Convex Hull of 2D Points");
+// }
