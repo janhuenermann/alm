@@ -1,4 +1,4 @@
-# alm
+# Alm
 This library implements common computer vision metrics in PyTorch. Algorithms are _tested_ and can serve as an easy starting point to benchmark algorithms.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1-0gkNZOWqhUNsTbfjSfqZAtN89PCyyx6?usp=sharing)
@@ -20,3 +20,9 @@ This library implements common computer vision metrics in PyTorch. Algorithms ar
 ```bash
 pip install git+https://github.com/janhuenermann/alm.git
 ```
+
+## Use Cases
+
+Here are some tutorials to apply Alm to real world machine learning tasks:
+
+- [Compute Average Precision (for boxes and rotated boxes) in PyTorch Lightning](examples/AP-PyTorch-Lightning.md)
