@@ -5,16 +5,18 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtensio
 ext_modules = []
 
 try:
+    kwargs = {"extra_compile_args": {"cxx": ["-O3"], "nvcc": ["-Xptxas", "-O3"]}}
     ext_modules.append(CUDAExtension('alm_ext_gpu', [
         "src/alm/ext/polygon_gpu.cpp",
         "src/alm/ext/polygon_cpu_kernel.cpp",
         "src/alm/ext/polygon_gpu_kernel.cu",
-    ]))
+    ], **kwargs))
 except OSError:
+    kwargs = {"extra_compile_args": "-O3"}
     ext_modules.append(CppExtension('alm_ext_cpu', [
         "src/alm/ext/polygon_cpu.cpp",
         "src/alm/ext/polygon_cpu_kernel.cpp"
-    ]))
+    ], **kwargs))
 
 
 setuptools.setup(
