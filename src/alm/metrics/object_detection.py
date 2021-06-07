@@ -77,9 +77,10 @@ def convex_iou(poly1, poly2, eps: float = 0.):
     ---
     returns: [*]
     """
+    fut_inter = torch.jit.fork(area_of_intersection, poly1, poly2)
     area1 = shoelace(poly1)
     area2 = shoelace(poly2)
-    inter = area_of_intersection(poly1, poly2)
+    inter = torch.jit.wait(fut_inter)
     union = area1 + area2 - inter
     return inter / (union + eps)
 
@@ -98,7 +99,7 @@ def xywha_to_4xy(xywha):
         [ 1,  1],
         [ 1, -1]], device=xywha.device, dtype=xywha.dtype)
     basis = xywha[..., 2:4, None] / 2. * rotation_basis(xywha[..., 4])
-    return xywha[..., :2] + torch.matmul(T.expand(basis.shape[:-2] + (-1, -1,)), basis)
+    return xywha[..., None, :2] + torch.matmul(T.expand(basis.shape[:-2] + (-1, -1,)), basis)
 
 
 @torch.jit.script
