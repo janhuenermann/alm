@@ -2,6 +2,7 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 from typing import Optional
+import math
 
 from alm.geometry.polygon import area_of_intersection, shoelace
 
@@ -92,14 +93,30 @@ def rotation_basis(angle):
 
 
 @torch.jit.script
-def xywha_to_4xy(xywha):
+def xywh_to_4xy(xywh):
     T = torch.tensor([
-        [-1, -1],
-        [-1,  1],
-        [ 1,  1],
-        [ 1, -1]], device=xywha.device, dtype=xywha.dtype)
-    basis = xywha[..., 2:4, None] / 2. * rotation_basis(xywha[..., 4])
-    return xywha[..., None, :2] + torch.matmul(T.expand(basis.shape[:-2] + (-1, -1,)), basis)
+        [-0.5, -0.5],
+        [-0.5,  0.5],
+        [ 0.5,  0.5],
+        [ 0.5, -0.5]], device=xywh.device, dtype=xywh.dtype)
+    xy, wh = xywh[..., None, :2], xywh[..., 2:4].diag_embed()
+    return xy + T.expand(wh.shape[:-2] + (-1, -1,)).matmul(wh)
+
+
+@torch.jit.script
+def xywha_to_4xy(xywha, upper_left_first: bool = False):
+    T = torch.tensor([
+        [-0.5, -0.5],
+        [-0.5,  0.5],
+        [ 0.5,  0.5],
+        [ 0.5, -0.5]], device=xywha.device, dtype=xywha.dtype)
+    xy, basis = xywha[..., None, :2], xywha[..., 2:4, None] * rotation_basis(xywha[..., 4])
+    points = xy + T.expand(basis.shape[:-2] + (-1, -1,)).matmul(basis)
+    if upper_left_first:
+        shifts = (2. * xywha[..., -1] / math.pi).round().long()
+        indices = (torch.arange(4).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)) % 4
+        points = points.gather(-2, indices.unsqueeze(-1).expand(indices.shape + (2,)))
+    return points
 
 
 @torch.jit.script

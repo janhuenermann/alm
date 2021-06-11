@@ -1,6 +1,6 @@
 import unittest
 import torch
-from alm.metrics.object_detection import iou, xywha_to_4xy, box_iou, generalized_box_iou, average_precision
+from alm.metrics.object_detection import iou, xywha_to_4xy, xywh_to_4xy, box_iou, generalized_box_iou, average_precision
 from alm.geometry.polygon import area_of_intersection, normalize_polygon
 from math import pi, sqrt
 
@@ -47,6 +47,39 @@ class TestBoxIOU(unittest.TestCase):
       expected = [-0.5, -1/6.05, 1./9., 1.]
       for result_i, expected_i in zip(result, expected):
          self.assertTrue(torch.isclose(result_i, torch.tensor(expected_i)), (result_i.item(), expected_i))
+
+
+class TestCoordTransform(unittest.TestCase):
+
+   def test_xywh(self):
+      out = xywh_to_4xy(torch.tensor([
+         [1., 1., 0.5, 0.5],
+         [0., 0., 5.0, 5.0]
+      ]))
+
+      self.assertTrue(torch.allclose(out, torch.tensor([
+         [[0.75, 0.75], [0.75, 1.25], [1.25, 1.25], [1.25, 0.75]],
+         [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],
+      ])), out)
+
+   def test_xywha(self):
+      xywha = torch.tensor([
+         [1., 1., 0.5, 0.5, 0.0],
+         [0., 0., 5.0, 5.0, 0.],
+         [0., 0., 5.0, 5.0, -pi / 2.],
+         [0., 0., 5.0, 5.0, pi / 2.],
+         [0., 0., 5.0, 5.0, 5. * pi / 2.],
+      ])
+
+      out = xywha_to_4xy(xywha, upper_left_first=True)
+
+      self.assertTrue(torch.allclose(out, torch.tensor([
+         [[0.75, 0.75], [0.75, 1.25], [1.25, 1.25], [1.25, 0.75]],
+         [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],
+         [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],
+         [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],
+         [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],
+      ])), out)
 
 
 class TestRotatedIOU(unittest.TestCase):
