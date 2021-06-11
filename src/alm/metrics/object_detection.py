@@ -109,7 +109,7 @@ def xywha_to_xy4(xywha, angle: Optional[Tensor] = None, upper_left_first: bool =
     points = xy + T.matmul(basis)
     if upper_left_first:
         shifts = torch.round(2. * angle.detach() / math.pi).long()
-        indices = torch.arange(4).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)
+        indices = torch.arange(0, 4).to(basis.device).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)
         points = points.gather(-2, (indices % 4).unsqueeze(-1).expand(indices.shape + (2,)))
     return points
 
