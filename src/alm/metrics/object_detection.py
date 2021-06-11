@@ -6,7 +6,6 @@ import math
 
 from alm.geometry.polygon import area_of_intersection, shoelace
 
-
 @torch.jit.script
 def box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     """
@@ -93,30 +92,32 @@ def rotation_basis(angle):
 
 
 @torch.jit.script
-def xywh_to_4xy(xywh):
-    T = torch.tensor([
-        [-0.5, -0.5],
-        [-0.5,  0.5],
-        [ 0.5,  0.5],
-        [ 0.5, -0.5]], device=xywh.device, dtype=xywh.dtype)
-    xy, wh = xywh[..., None, :2], xywh[..., 2:4].diag_embed()
-    return xy + T.expand(wh.shape[:-2] + (-1, -1,)).matmul(wh)
+def xywh_to_xy4(xywh):
+    xy, wh = xywh[..., None, :2], xywh[..., 2:4]
+    T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]])
+    T = T.to(wh).expand(wh.shape[:-1] + (-1, -1,))
+    return xy + T.matmul(wh.diag_embed())
 
 
 @torch.jit.script
-def xywha_to_4xy(xywha, upper_left_first: bool = False):
-    T = torch.tensor([
-        [-0.5, -0.5],
-        [-0.5,  0.5],
-        [ 0.5,  0.5],
-        [ 0.5, -0.5]], device=xywha.device, dtype=xywha.dtype)
-    xy, basis = xywha[..., None, :2], xywha[..., 2:4, None] * rotation_basis(xywha[..., 4])
-    points = xy + T.expand(basis.shape[:-2] + (-1, -1,)).matmul(basis)
+def xywha_to_xy4(xywha, angle: Optional[Tensor] = None, upper_left_first: bool = False):
+    if angle is None:
+        angle = xywha[..., 4]
+    xy, basis = xywha[..., None, :2], xywha[..., 2:4, None] * rotation_basis(angle)
+    T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]])
+    T = T.to(basis).expand(basis.shape[:-2] + (-1, -1,))
+    points = xy + T.matmul(basis)
     if upper_left_first:
-        shifts = (2. * xywha[..., -1] / math.pi).round().long()
-        indices = (torch.arange(4).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)) % 4
-        points = points.gather(-2, indices.unsqueeze(-1).expand(indices.shape + (2,)))
+        shifts = torch.round(2. * angle.detach() / math.pi).long()
+        indices = torch.arange(4).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)
+        points = points.gather(-2, (indices % 4).unsqueeze(-1).expand(indices.shape + (2,)))
     return points
+
+
+@torch.jit.script
+def xy4_to_box(xy4):
+    assert xy4.size(-1) == 2 and xy4.size(-2) > 1
+    return torch.cat((xy4.min(-2)[0], xy4.max(-2)[0]), -1)
 
 
 @torch.jit.script
@@ -138,7 +139,7 @@ def iou(labels, predictions, tensor_format: str = "xyxy"):
         return box_iou(labels, predictions)
     elif tensor_format == "xywha":
         assert labels.size(-1) == 5
-        return convex_iou(xywha_to_4xy(labels), xywha_to_4xy(predictions))
+        return convex_iou(xywha_to_xy4(labels), xywha_to_xy4(predictions))
     else:
         raise RuntimeError("Unrecognized tensor format: {}".format(tensor_format))
 
