@@ -2,7 +2,7 @@ import unittest
 import torch
 from alm.metrics.object_detection import iou, xywha_to_xy4, xywh_to_xy4, box_iou, generalized_box_iou, average_precision
 from alm.geometry.polygon import area_of_intersection, normalize_polygon
-from math import pi, sqrt
+from math import pi, sqrt, cos, sin, sqrt
 
 class TestBoxIOU(unittest.TestCase):
 
@@ -65,14 +65,32 @@ class TestCoordTransform(unittest.TestCase):
    def test_xywha(self):
       xywha = torch.tensor([
          [1., 1., 0.5, 0.5, 0.0],
-         [0., 0., 5.0, 5.0, 0.],
+         [1., 1., 1.0, 2.0, pi / 180 * 30],
+         [1., 3., 4.0, 2.0, pi / 180 * 80],
+         [6., 3., sqrt(2) * 3, sqrt(2) * 2, pi / 180 * 10],
+      ])
+
+      for i, out in enumerate(xywha_to_xy4(xywha)):
+         x, y, w, h, a = xywha[i]
+         r00, r01 = w / 2 * cos(a), -h / 2 * sin(a)
+         r10, r11 = w / 2 * sin(a),  h / 2 * cos(a)
+         p10 = [x - r00 - r01, y - r10 - r11]
+         p11 = [x - r00 + r01, y - r10 + r11]
+         p12 = [x + r00 + r01, y + r10 + r11]
+         p13 = [x + r00 - r01, y + r10 - r11]
+         rec = torch.tensor([p10, p11, p12, p13])
+         self.assertTrue(torch.allclose(out, rec), (rec, out))
+
+   def test_xywha2(self):
+      xywha = torch.tensor([
+         [1., 1., 0.5, 0.5, 0.0],
+         [0., 0., 5.0, 5.0, 0.0],
          [0., 0., 5.0, 5.0, -pi / 2.],
          [0., 0., 5.0, 5.0, pi / 2.],
          [0., 0., 5.0, 5.0, 5. * pi / 2.],
       ])
 
       out = xywha_to_xy4(xywha, upper_left_first=True)
-
       self.assertTrue(torch.allclose(out, torch.tensor([
          [[0.75, 0.75], [0.75, 1.25], [1.25, 1.25], [1.25, 0.75]],
          [[-2.5, -2.5], [-2.5, 2.5], [2.5, 2.5], [2.5, -2.5]],

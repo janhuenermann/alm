@@ -4,6 +4,7 @@ from torch.nn import functional as F
 from typing import Optional
 import math
 
+from alm.utils import check_shape
 from alm.geometry.polygon import area_of_intersection, shoelace
 
 @torch.jit.script
@@ -16,6 +17,9 @@ def box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     strict: Bool whether to check if x1 > x2 or y1 > y2
     eps: Numerical stability epsilon used for division
     """
+    assert check_shape(boxes1, [None, 4], "boxes1")
+    assert check_shape(boxes2, [None, 4], "boxes2")
+
     mins = torch.min(boxes1, boxes2)
     maxs = torch.max(boxes1, boxes2)
 
@@ -46,6 +50,9 @@ def generalized_box_iou(boxes1, boxes2, strict: bool = False, eps: float = 0.):
     strict: Bool whether to check if x1 > x2 or y1 > y2
     eps: Numerical stability epsilon used for division
     """
+    assert check_shape(boxes1, [None, 4], "boxes1")
+    assert check_shape(boxes2, [None, 4], "boxes2")
+
     mins = torch.min(boxes1, boxes2)
     maxs = torch.max(boxes1, boxes2)
 
@@ -77,6 +84,8 @@ def convex_iou(poly1, poly2, eps: float = 0.):
     ---
     returns: [*]
     """
+    assert check_shape(poly1, [None, -1, 2], "poly1")
+    assert check_shape(poly2, [None, -1, 2], "poly2")
     fut_inter = torch.jit.fork(area_of_intersection, poly1, poly2)
     area1 = shoelace(poly1)
     area2 = shoelace(poly2)
@@ -86,37 +95,62 @@ def convex_iou(poly1, poly2, eps: float = 0.):
 
 
 @torch.jit.script
-def rotation_basis(angle):
+def rotation_basis(angle, transpose: bool = False):
     c, s = angle.cos(), angle.sin()
-    return torch.stack((c, -s, s, c), -1).view(angle.shape + (2, 2,))
+    if transpose:
+        out = torch.stack((c, s, -s, c), -1)
+    else:
+        out = torch.stack((c, -s, s, c), -1)
+    return out.view(angle.shape + (2, 2,))
 
 
 @torch.jit.script
 def xywh_to_xy4(xywh):
+    assert check_shape(xywh, [None, 4], "xywh")
     xy, wh = xywh[..., None, :2], xywh[..., 2:4]
     T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]])
     T = T.to(wh).expand(wh.shape[:-1] + (-1, -1,))
-    return xy + T.matmul(wh.diag_embed())
+    return xy + T * wh.unsqueeze(-2)  # broadcast along row dimension
 
 
 @torch.jit.script
 def xywha_to_xy4(xywha, angle: Optional[Tensor] = None, upper_left_first: bool = False):
+    assert check_shape(xywha, [None, 5], "xywha")
     if angle is None:
         angle = xywha[..., 4]
-    xy, basis = xywha[..., None, :2], xywha[..., 2:4, None] * rotation_basis(angle)
+    xy, basis_T = xywha[..., None, :2], xywha[..., 2:4, None] * rotation_basis(angle, transpose=True)
     T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]])
-    T = T.to(basis).expand(basis.shape[:-2] + (-1, -1,))
-    points = xy + T.matmul(basis)
+    T = T.to(basis_T).expand(basis_T.shape[:-2] + (-1, -1,))
+    points = xy + T.matmul(basis_T)
     if upper_left_first:
         shifts = torch.round(2. * angle.detach() / math.pi).long()
-        indices = torch.arange(0, 4).to(basis.device).expand(shifts.shape + (4,)) - shifts.unsqueeze(-1)
+        indices = torch.arange(0, 4).to(points.device).expand(shifts.shape + (4,)) + shifts.unsqueeze(-1)
         points = points.gather(-2, (indices % 4).unsqueeze(-1).expand(indices.shape + (2,)))
     return points
 
 
 @torch.jit.script
+def project_rotated_boxes(xywha1, xywha2, upper_left_first: bool = False):
+    assert check_shape(xywha1, [None, 5], "xywha1")
+    assert check_shape(xywha2, [None, 5], "xywha2")
+    T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]]).to(xywha1)
+    # Project 1
+    proj1 = T.expand(xywha1.shape[:-1] + (-1, -1,)) * xywha1[..., 2:4].unsqueeze(-2)
+    # Project 2
+    offset = rotation_basis(-xywha1[..., 4]).matmul(xywha2[:2] - xywha1[:2])
+    angle = xywha2[..., 4] - xywha1[..., 4]
+    basis2_T = xywha2[..., 2:4, None] * rotation_basis(angle, transpose=True)
+    proj2 = T.expand(xywha2.shape[:-1] + (-1, -1,)).matmul(basis2_T) + offset
+    if upper_left_first:
+        shifts = torch.round(2. * angle.detach() / math.pi).long()
+        indices = torch.arange(0, 4).to(proj2.device).expand(shifts.shape + (4,)) + shifts.unsqueeze(-1)
+        proj2 = proj2.gather(-2, (indices % 4).unsqueeze(-1).expand(indices.shape + (2,)))
+    return proj1, proj2
+
+
+@torch.jit.script
 def xy4_to_box(xy4):
-    assert xy4.size(-1) == 2 and xy4.size(-2) > 1
+    assert check_shape(xy4, [None, 2], "xy4")
     return torch.cat((xy4.min(-2)[0], xy4.max(-2)[0]), -1)
 
 
@@ -133,12 +167,9 @@ def iou(labels, predictions, tensor_format: str = "xyxy"):
 
     Returns IOU in shape [*]
     """
-    assert predictions.size(-1) == labels.size(-1)
     if tensor_format == "xyxy":
-        assert labels.size(-1) == 4
         return box_iou(labels, predictions)
     elif tensor_format == "xywha":
-        assert labels.size(-1) == 5
         return convex_iou(xywha_to_xy4(labels), xywha_to_xy4(predictions))
     else:
         raise RuntimeError("Unrecognized tensor format: {}".format(tensor_format))
