@@ -74,6 +74,9 @@ def check_shape(tensor: Tensor, target_shape: List[Optional[int]], error_label: 
 
 
 def measure_timing(fn):
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+    torch.cuda.synchronize()
     start.record()
     result = fn()
     end.record()

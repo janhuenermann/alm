@@ -131,6 +131,19 @@ def xywha_to_xy4(xywha, angle: Optional[Tensor] = None, upper_left_first: bool =
 
 @torch.jit.script
 def project_rotated_boxes(xywha1, xywha2, upper_left_first: bool = False):
+    """
+    Projects rotated bounding box xywha2 to the local coordinate system
+    of rotated bounding box xywha1 and returns the polygon.
+
+    Returns
+    -------
+    poly1
+        Tensor in shape (*, 4, 2) with counter-clockwise polygon coords
+        of projected bounding box xywha1 (always a rectangle)
+    poly2
+        Tensor in shape (*, 4, 2) with counter-clockwise polygon coords
+        of projected bounding box xywha2
+    """
     assert check_shape(xywha1, [None, 5], "xywha1")
     assert check_shape(xywha2, [None, 5], "xywha2")
     T = torch.tensor([[-0.5, -0.5], [-0.5,  0.5], [ 0.5,  0.5], [ 0.5, -0.5]]).to(xywha1)
