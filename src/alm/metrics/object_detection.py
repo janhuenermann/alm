@@ -150,7 +150,7 @@ def project_rotated_boxes(xywha1, xywha2, upper_left_first: bool = False):
     # Project 1
     proj1 = T.expand(xywha1.shape[:-1] + (-1, -1,)) * xywha1[..., 2:4].unsqueeze(-2)
     # Project 2
-    offset = rotation_basis(-xywha1[..., 4]).matmul(xywha2[:2] - xywha1[:2])
+    offset = (xywha2[..., None, :2] - xywha1[..., None, :2]).matmul(rotation_basis(-xywha1[..., 4], transpose=True))
     angle = xywha2[..., 4] - xywha1[..., 4]
     basis2_T = xywha2[..., 2:4, None] * rotation_basis(angle, transpose=True)
     proj2 = T.expand(xywha2.shape[:-1] + (-1, -1,)).matmul(basis2_T) + offset
